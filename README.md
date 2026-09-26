@@ -10,7 +10,7 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite. The dashboard is the root page. Choose an exercise, run the calibration countdown, and start a ten-rep session. `npm run dev` builds the local SolarXR protocol package before starting Vite.
+Open the local URL printed by Vite. The dashboard is the root page. Choose an exercise and select **Start Warm-Up**. After eight mock reps, the app averages all eight into a personal baseline and enables **Start Training Session**. The ten training reps are compared with that baseline. **Redo Warm-Up** clears the previous baseline and training results. The calibration countdown is an optional mock demonstration. `npm run dev` builds the local SolarXR protocol package before starting Vite.
 
 ## Checks
 
@@ -23,7 +23,7 @@ npm run build
 ## Architecture
 
 - `src/components/sports/` contains the dashboard and styling.
-- `src/analysis/` contains normalized exercise frames, the mock 30 Hz provider, baseline calculations, and mock SolarXR bones.
+- `src/analysis/` contains normalized exercise frames, the mock 30 Hz provider, the warm-up baseline calculator, training comparison calculations, and mock SolarXR bones. Warm-up reps, training reps, and the calculated baseline are held separately in React state; refreshing the page clears them.
 - `src/components/widgets/SkeletonVisualizerWidget.tsx` remains SlimeVR's renderer. MotionLab passes mock `BoneT` values through its optional `bonesOverride` input; other SlimeVR pages retain the existing server-fed `bonesAtom` path.
 - `solarxr-protocol/` is the local protocol package used by the frontend. Its dependency path points within this repository.
 - The original SlimeVR home page remains available at `/#/slimevr` when a server is connected.

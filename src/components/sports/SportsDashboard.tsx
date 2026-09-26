@@ -5,11 +5,14 @@ import {
   SkeletonPreviewView,
   SkeletonVisualizerWidget,
 } from '@/components/widgets/SkeletonVisualizerWidget';
-import { baseline, summary } from '@/analysis/metrics';
+import { calculateBaseline, ExerciseBaseline } from '@/analysis/baseline';
+import { compareToBaseline, consistencyScore } from '@/analysis/comparison';
+import { summary } from '@/analysis/metrics';
 import {
   MockExerciseProvider,
   mockFrame,
   SESSION_REPS,
+  WARMUP_REPS,
 } from '@/analysis/mockExerciseStream';
 import { mockSkeleton } from '@/analysis/mockSkeleton';
 import { Exercise, ExerciseRep } from '@/analysis/types';
@@ -34,7 +37,7 @@ const CHARTS: Record<
   ChartMetric,
   { label: string; unit: string; min: number; max: number }
 > = {
-  formScore: { label: 'Form score', unit: '', min: 70, max: 100 },
+  formScore: { label: 'Consistency', unit: '', min: 0, max: 100 },
   depth: { label: 'Depth', unit: '%', min: 75, max: 105 },
   torsoLean: { label: 'Torso lean', unit: '°', min: 0, max: 50 },
   symmetry: { label: 'Knee symmetry', unit: '°', min: 0, max: 10 },
@@ -134,11 +137,16 @@ function Metric({
 export function SportsDashboard() {
   const provider = useMemo(() => new MockExerciseProvider(), []);
   const [exercise, setExercise] = useState<Exercise>('squat');
-  const [frame, setFrame] = useState(() => mockFrame('squat', 0, 0));
-  const [reps, setReps] = useState<ExerciseRep[]>([]);
-  const [session, setSession] = useState<'ready' | 'running' | 'complete'>(
-    'ready'
+  const [frame, setFrame] = useState(() =>
+    mockFrame('squat', 0, 0, 'warmup', WARMUP_REPS)
   );
+  const [warmupReps, setWarmupReps] = useState<ExerciseRep[]>([]);
+  const [trainingReps, setTrainingReps] = useState<ExerciseRep[]>([]);
+  const [baseline, setBaseline] = useState<ExerciseBaseline | null>(null);
+  const baselineRef = useRef<ExerciseBaseline | null>(null);
+  const [session, setSession] = useState<
+    'ready' | 'warmup' | 'warmupComplete' | 'training' | 'trainingComplete'
+  >('ready');
   const [chartMetric, setChartMetric] = useState<ChartMetric>('formScore');
   const [calibration, setCalibration] = useState<number | 'complete' | null>(
     null
@@ -146,21 +154,55 @@ export function SportsDashboard() {
   const [trackersOpen, setTrackersOpen] = useState(false);
   const view = useRef<SkeletonPreviewView | null>(null);
   const bones = useMemo(() => mockSkeleton(frame), [frame]);
-  const reference = baseline(reps);
-  const latest = reps.at(-1);
-  const report = summary(reps);
+  const latest = trainingReps.at(-1);
+  const comparison =
+    baseline && latest ? compareToBaseline(latest, baseline) : null;
+  const report = summary(trainingReps, baseline);
+  const showingWarmup =
+    session === 'ready' || session === 'warmup' || session === 'warmupComplete';
+  const completedReps = showingWarmup ? warmupReps.length : trainingReps.length;
+  const targetReps = showingWarmup ? WARMUP_REPS : SESSION_REPS;
+  const displayedScore = showingWarmup
+    ? warmupReps.at(-1)?.formScore
+    : latest?.formScore;
 
   useEffect(() => {
     const unsubscribe = provider.subscribe((event) => {
       if (event.type === 'frame') setFrame(event.frame);
-      if (event.type === 'rep') setReps((current) => [...current, event.rep]);
-      if (event.type === 'complete') setSession('complete');
+      if (event.type === 'rep') {
+        if (event.phase === 'warmup') {
+          setWarmupReps((current) => [...current, event.rep]);
+        } else if (baselineRef.current) {
+          const result = compareToBaseline(event.rep, baselineRef.current);
+          setTrainingReps((current) => [
+            ...current,
+            { ...event.rep, formScore: consistencyScore(result) },
+          ]);
+        }
+      }
+      if (event.type === 'complete') {
+        setSession(
+          event.phase === 'warmup' ? 'warmupComplete' : 'trainingComplete'
+        );
+      }
     });
     return () => {
       unsubscribe();
       provider.stop();
     };
   }, [provider]);
+
+  useEffect(() => {
+    if (
+      session !== 'warmupComplete' ||
+      warmupReps.length !== WARMUP_REPS ||
+      baseline
+    )
+      return;
+    const personalBaseline = calculateBaseline(warmupReps);
+    baselineRef.current = personalBaseline;
+    setBaseline(personalBaseline);
+  }, [session, warmupReps, baseline]);
 
   useEffect(() => {
     if (calibration === null || calibration === 'complete') return;
@@ -173,10 +215,28 @@ export function SportsDashboard() {
 
   const reset = (mode = exercise) => {
     provider.stop();
-    setReps([]);
-    setFrame(mockFrame(mode, 0, 0));
+    baselineRef.current = null;
+    setWarmupReps([]);
+    setTrainingReps([]);
+    setBaseline(null);
+    setFrame(mockFrame(mode, 0, 0, 'warmup', WARMUP_REPS));
     setSession('ready');
     setChartMetric('formScore');
+  };
+
+  const startWarmup = () => {
+    reset();
+    setSession('warmup');
+    provider.start({ exercise, phase: 'warmup', targetReps: WARMUP_REPS });
+  };
+
+  const startTraining = () => {
+    if (!baseline || baseline.exercise !== exercise || session === 'warmup')
+      return;
+    setTrainingReps([]);
+    setFrame(mockFrame(exercise, 0, 0, 'training', SESSION_REPS));
+    setSession('training');
+    provider.start({ exercise, phase: 'training', targetReps: SESSION_REPS });
   };
 
   const setView = (position: Vector3) => {
@@ -185,24 +245,8 @@ export function SportsDashboard() {
     view.current.controls.update();
   };
 
-  const depthChange =
-    reference && latest
-      ? ((latest.depth - reference.depth) / reference.depth) * 100
-      : 0;
-  const leanChange =
-    reference && latest ? latest.torsoLean - reference.torsoLean : 0;
-  const symmetryChange =
-    reference && latest
-      ? Math.abs(latest.leftKneeAngle - latest.rightKneeAngle) -
-        reference.kneeDifference
-      : 0;
-  const durationChange =
-    reference && latest ? latest.repDuration - reference.repDuration : 0;
-  const alert =
-    reference &&
-    latest &&
-    latest.rep >= 5 &&
-    (depthChange < -5 || leanChange > 4 || symmetryChange > 2);
+  const fromBaseline = (value: number, digits: number, unit: string) =>
+    `${value >= 0 ? '+' : ''}${format(value, digits)}${unit} from baseline`;
 
   return (
     <div className="sports-app">
@@ -261,19 +305,26 @@ export function SportsDashboard() {
               Reset
             </button>
             <button
-              className="primary-button"
-              onClick={() => {
-                setReps([]);
-                setSession('running');
-                provider.start(exercise);
-              }}
-              disabled={session === 'running'}
+              className={baseline ? 'secondary-button' : 'primary-button'}
+              onClick={startWarmup}
+              disabled={session === 'warmup'}
             >
-              {session === 'running'
-                ? 'Session running'
-                : session === 'complete'
-                  ? 'Start new session'
-                  : 'Start session'}{' '}
+              {session === 'warmup'
+                ? 'Warm-Up in progress'
+                : baseline
+                  ? 'Redo Warm-Up'
+                  : 'Start Warm-Up'}
+            </button>
+            <button
+              className="primary-button"
+              onClick={startTraining}
+              disabled={
+                !baseline || session === 'warmup' || session === 'training'
+              }
+            >
+              {session === 'training'
+                ? 'Training in progress'
+                : 'Start Training Session'}{' '}
               <span>↗</span>
             </button>
           </div>
@@ -309,9 +360,11 @@ export function SportsDashboard() {
               />
               <div className="viewport-status">
                 <span className="live-dot" />{' '}
-                {session === 'running'
-                  ? 'CAPTURING MOTION'
-                  : 'MOCK TRACKING READY'}
+                {session === 'warmup'
+                  ? 'WARM-UP IN PROGRESS'
+                  : session === 'training'
+                    ? 'CAPTURING TRAINING MOTION'
+                    : 'MOCK TRACKING READY'}
               </div>
               <div className="viewport-axis">
                 Y ↑ <span>X →</span>
@@ -345,15 +398,15 @@ export function SportsDashboard() {
             </div>
             <div className="rep-banner">
               <div>
-                <span>CURRENT REP</span>
+                <span>{showingWarmup ? 'WARM-UP REPS' : 'TRAINING REPS'}</span>
                 <strong>
-                  {frame.rep.toString().padStart(2, '0')}
-                  <em> / {SESSION_REPS}</em>
+                  {completedReps.toString().padStart(2, '0')}
+                  <em> / {targetReps}</em>
                 </strong>
               </div>
               <div className="rep-progress">
                 <div
-                  style={{ width: `${(frame.rep / SESSION_REPS) * 100}%` }}
+                  style={{ width: `${(completedReps / targetReps) * 100}%` }}
                 />
               </div>
             </div>
@@ -405,17 +458,80 @@ export function SportsDashboard() {
             </div>
             <div className="score-row">
               <div>
-                <span>FORM CONSISTENCY</span>
+                <span>
+                  {showingWarmup
+                    ? 'WARM-UP MOCK SCORE'
+                    : 'CONSISTENCY VS BASELINE'}
+                </span>
                 <strong>
-                  {latest ? format(latest.formScore) : '—'}
+                  {displayedScore === undefined ? '—' : format(displayedScore)}
                   <small> / 100</small>
                 </strong>
               </div>
               <div className="score-meter">
-                <div style={{ width: `${latest?.formScore ?? 0}%` }} />
+                <div style={{ width: `${displayedScore ?? 0}%` }} />
               </div>
             </div>
           </div>
+        </section>
+
+        <section
+          className="sports-panel personal-baseline-panel"
+          aria-live="polite"
+        >
+          <div>
+            <span className="panel-index">PERSONAL BASELINE</span>
+            <h2>
+              Baseline:{' '}
+              {baseline
+                ? 'Ready'
+                : session === 'warmup' || session === 'warmupComplete'
+                  ? 'Recording'
+                  : 'Not created'}
+            </h2>
+            <p>
+              {baseline ? (
+                <>
+                  <strong>Warm-Up Complete.</strong> Personal baseline created
+                  from {baseline.sampleSize} reps.
+                </>
+              ) : session === 'warmup' || session === 'warmupComplete' ? (
+                `Rep ${warmupReps.length} / ${WARMUP_REPS} completed`
+              ) : (
+                'Complete an 8-rep warm-up before training.'
+              )}
+            </p>
+          </div>
+          {baseline && (
+            <div className="personal-baseline-values">
+              <span>
+                Knees{' '}
+                <strong>
+                  {format(
+                    (baseline.leftKneeAngle + baseline.rightKneeAngle) / 2,
+                    1
+                  )}
+                  °
+                </strong>
+              </span>
+              <span>
+                Hip <strong>{format(baseline.hipAngle, 1)}°</strong>
+              </span>
+              <span>
+                Torso <strong>{format(baseline.torsoLean, 1)}°</strong>
+              </span>
+              <span>
+                Depth <strong>{format(baseline.depth, 1)}%</strong>
+              </span>
+              <span>
+                Duration <strong>{format(baseline.repDuration, 2)} s</strong>
+              </span>
+              <span>
+                Knee difference{' '}
+                <strong>{format(baseline.kneeAsymmetry, 1)}°</strong>
+              </span>
+            </div>
+          )}
         </section>
 
         <section className="sports-lower">
@@ -438,10 +554,10 @@ export function SportsDashboard() {
                 </button>
               ))}
             </div>
-            <Chart reps={reps} metric={chartMetric} />
+            <Chart reps={trainingReps} metric={chartMetric} />
             <div className="chart-caption">
               <span>
-                BASELINE <strong>REPS 1–3</strong>
+                BASELINE <strong>8 WARM-UP REPS</strong>
               </span>
               <span>REP NUMBER →</span>
             </div>
@@ -454,55 +570,55 @@ export function SportsDashboard() {
                   <h2>Baseline comparison</h2>
                 </div>
               </div>
-              <p>Compared with your first three reps</p>
+              <p>Latest training rep compared with your 8-rep warm-up</p>
               <div className="baseline-row">
                 <span>Depth</span>
                 <strong>
-                  {reference
-                    ? `${depthChange >= 0 ? '+' : ''}${format(depthChange, 1)}%`
+                  {comparison
+                    ? fromBaseline(comparison.depthPercent, 1, '%')
                     : '—'}
                 </strong>
               </div>
               <div className="baseline-row">
                 <span>Torso lean</span>
                 <strong>
-                  {reference
-                    ? `${leanChange >= 0 ? '+' : ''}${format(leanChange, 1)}°`
+                  {comparison
+                    ? fromBaseline(comparison.torsoLean, 1, '°')
                     : '—'}
                 </strong>
               </div>
               <div className="baseline-row">
                 <span>Left / right knee</span>
                 <strong>
-                  {reference
-                    ? `${symmetryChange >= 0 ? '+' : ''}${format(symmetryChange, 1)}°`
+                  {comparison
+                    ? fromBaseline(comparison.kneeAsymmetry, 1, '°')
                     : '—'}
                 </strong>
               </div>
               <div className="baseline-row">
                 <span>Rep duration</span>
                 <strong>
-                  {reference
-                    ? `${durationChange >= 0 ? '+' : ''}${format(durationChange, 2)}s`
+                  {comparison
+                    ? fromBaseline(comparison.repDuration, 2, ' s')
                     : '—'}
                 </strong>
               </div>
             </div>
-            <div
-              className={`sports-panel insight-panel ${alert ? 'has-alert' : ''}`}
-            >
-              <div className="insight-icon">{alert ? '↗' : '◎'}</div>
+            <div className="sports-panel insight-panel">
+              <div className="insight-icon">◎</div>
               <div>
                 <span className="panel-index">MOVEMENT INSIGHT</span>
                 <h3>
-                  {alert
-                    ? 'Form deviation detected'
+                  {comparison
+                    ? 'Compared with your warm-up'
                     : 'Movement baseline pending'}
                 </h3>
                 <p>
-                  {alert
-                    ? `Torso lean has increased ${format(leanChange, 1)}° and depth has changed ${format(depthChange, 1)}% from baseline.`
-                    : 'Complete three reps to establish your movement baseline.'}
+                  {comparison
+                    ? `Torso lean ${fromBaseline(comparison.torsoLean, 1, '°')}; depth ${fromBaseline(comparison.depthPercent, 1, '%')}.`
+                    : baseline
+                      ? 'Complete a training rep to compare it with your warm-up.'
+                      : 'Complete the warm-up to create your personal baseline.'}
                 </p>
               </div>
             </div>
@@ -538,7 +654,7 @@ export function SportsDashboard() {
           )}
         </section>
 
-        {session === 'complete' && report && (
+        {session === 'trainingComplete' && report && (
           <section className="sports-panel summary-panel">
             <div className="panel-top">
               <div>
@@ -573,8 +689,8 @@ export function SportsDashboard() {
                 unit="°"
               />
               <Metric
-                label="ASYMMETRY TREND"
-                value={`${report.asymmetryTrend >= 0 ? '+' : ''}${format(report.asymmetryTrend, 1)}`}
+                label="ASYMMETRY VS BASELINE"
+                value={`${report.asymmetryChange >= 0 ? '+' : ''}${format(report.asymmetryChange, 1)}`}
                 unit="°"
               />
             </div>
@@ -590,7 +706,7 @@ export function SportsDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {reps.map((rep) => (
+                  {trainingReps.map((rep) => (
                     <tr key={rep.rep}>
                       <td>{String(rep.rep).padStart(2, '0')}</td>
                       <td>{rep.formScore}</td>

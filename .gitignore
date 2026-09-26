@@ -27,6 +27,7 @@ yarn-error.log*
 
 # vite
 /dist
+/.vite
 /stats.html
 vite.config.ts.timestamp*
 electron.vite.config.*.mjs
