@@ -14,7 +14,11 @@ Open the local URL printed by Vite. `npm run dev` builds the local SolarXR proto
 
 ## Live chest tracking
 
-Start SlimeVR Server on the same computer (the frontend defaults to `ws://localhost:21110`). Power on the tracker and connect it to the same network as the computer. ESP tracker USB connections are used for setup; motion arrives over Wi-Fi. Newly discovered trackers use SlimeVR's existing device approval dialog.
+Start SlimeVR Server as the local tracking service on the same computer (the frontend defaults to `ws://localhost:21110`). MotionLab exposes node setup directly; the original server dashboard and onboarding routes redirect to MotionLab.
+
+Open **Connect nodes**, enter the 2.4 GHz Wi-Fi network and password, and choose **Start USB setup**. Plug in and power on one ESP node at a time using a data-capable cable. Automatic detection selects its serial port; the USB selector also supports choosing a specific attached node. Setup reports USB detection, Wi-Fi connection, server discovery, and actionable errors. Choose **Stop USB setup** when finished or before changing credentials. Credentials are kept only for the active setup session, not stored in browser storage, and the node remembers its network. The computer must use the same network; iPhone hotspots need **Maximize Compatibility** enabled.
+
+Previously configured nodes reconnect when powered on. New wireless nodes found on the network show a **Connect node** action inside MotionLab. USB is for setup or charging; motion arrives over Wi-Fi. The local tracking service must remain running. A web page cannot start that service by itself.
 
 Select the physical tracker and choose **Assign to chest**. The UI waits for the server to confirm the assignment. Attach it to your chest, stand upright facing forward, then choose **Reset upright pose** to send a real SlimeVR full reset. Live mode uses the server's bone feed and adjusted tracker orientation, and stops displaying a live pose if the connection or data feed is lost. Other skeleton segments are inferred by SlimeVR. Knee angles, rep counts, and form scores remain unavailable with this single-tracker setup.
 
@@ -33,9 +37,10 @@ npm run build
 - `src/components/sports/` contains the dashboard and styling.
 - `src/components/sports/LiveMovementDashboard.tsx` uses the existing SolarXR data feeds, chest assignment RPC, and reset hook for physical trackers.
 - `src/analysis/` contains normalized exercise frames, the mock 30 Hz provider, the warm-up baseline calculator, training comparison calculations, and mock SolarXR bones. Warm-up reps, training reps, and the calculated baseline are held separately in React state; refreshing the page clears them.
-- `src/components/widgets/SkeletonVisualizerWidget.tsx` remains SlimeVR's renderer. MotionLab passes mock `BoneT` values through its optional `bonesOverride` input; other SlimeVR pages retain the existing server-fed `bonesAtom` path.
+- `src/components/sports/NodeSetup.tsx` uses serial discovery and Wi-Fi provisioning RPCs. The password is masked and cleared from the form after submission. `NodePicker.tsx` supplies the keyboard-accessible node selectors, including saved offline nodes.
+- `src/components/widgets/SkeletonVisualizerWidget.tsx` remains SlimeVR's renderer. The demo passes mock `BoneT` values through `bonesOverride`; live mode uses the server-fed `bonesAtom` path.
 - `solarxr-protocol/` is the local protocol package used by the frontend. Its dependency path points within this repository.
-- The original SlimeVR home page remains available at `/#/slimevr` when a server is connected.
+- Only the MotionLab live view and `/#/demo` are exposed; legacy dashboard, settings, and onboarding URLs redirect to the live view.
 
 The demo's sample motion and scores demonstrate a product concept; they are not validated biomechanics measurements. Its calibration is a mock countdown. The live dashboard's upright reset calls SlimeVR's reset API; live orientation is not a validated lifting score.
 

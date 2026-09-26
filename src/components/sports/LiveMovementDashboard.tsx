@@ -21,7 +21,8 @@ import {
   SkeletonVisualizerWidget,
 } from '@/components/widgets/SkeletonVisualizerWidget';
 import './SportsDashboard.scss';
-import { UnknownDeviceModal } from '@/components/UnknownDeviceModal';
+import { NodeSetup } from './NodeSetup';
+import { NodePicker } from './NodePicker';
 
 function trackerKey(tracker: TrackerDataT) {
   return `${tracker.trackerId?.deviceId?.id}:${tracker.trackerId?.trackerNum}`;
@@ -40,6 +41,7 @@ export function LiveMovementDashboard() {
   );
   const bones = useAtomValue(bonesAtom);
   const [selectedKey, setSelectedKey] = useState('');
+  const [setupOpen, setSetupOpen] = useState(false);
   const [now, setNow] = useState(Date.now);
   const [assignment, setAssignment] = useState<{
     key: string;
@@ -52,7 +54,7 @@ export function LiveMovementDashboard() {
     { type: ResetType.Full },
     () =>
       setCalibrationMessage(
-        'SlimeVR confirmed the full reset. Chest orientation is ready.'
+        'Upright pose reset confirmed. Chest orientation is ready.'
       ),
     () =>
       setCalibrationMessage(
@@ -84,7 +86,12 @@ export function LiveMovementDashboard() {
     : (
         available.find(
           ({ tracker }) => tracker.info?.bodyPart === BodyPart.CHEST
-        ) ?? (available.length === 1 ? available[0] : undefined)
+        ) ??
+        (available.length === 1 ? available[0] : undefined) ??
+        trackers.find(
+          ({ tracker }) => tracker.info?.bodyPart === BodyPart.CHEST
+        ) ??
+        (trackers.length === 1 ? trackers[0] : undefined)
       )?.tracker;
   const fresh = isConnected && now - received.current.trackers < 3000;
   const assigned = selected?.info?.bodyPart === BodyPart.CHEST;
@@ -104,17 +111,19 @@ export function LiveMovementDashboard() {
   const assignmentPending =
     assignment && !assignedConfirmation && now - assignment.sentAt < 5000;
   const status = !isConnected
-    ? 'Waiting for SlimeVR server'
+    ? 'Waiting for the local tracking service'
     : !fresh
       ? 'Waiting for fresh tracking data'
       : !available.length
-        ? 'Waiting for a connected tracker'
+        ? trackers.length
+          ? 'Your node is offline'
+          : 'Waiting for your first node'
         : !selected
-          ? 'Choose your chest tracker'
+          ? 'Choose your chest node'
           : !assigned
-            ? 'Assign this tracker to chest'
+            ? 'Assign this node to chest'
             : !live
-              ? 'Chest tracker is not streaming'
+              ? 'Chest node is not streaming'
               : 'Live chest orientation';
 
   const assignChest = () => {
@@ -136,7 +145,6 @@ export function LiveMovementDashboard() {
 
   return (
     <div className="sports-app">
-      <UnknownDeviceModal />
       <header className="sports-header">
         <div className="sports-brand">
           <div className="brand-mark">
@@ -150,9 +158,8 @@ export function LiveMovementDashboard() {
         <div className="sports-header-center">Movement intelligence</div>
         <div className="sports-header-right">
           <span className={live ? 'live-dot' : ''} />
-          {live ? 'LIVE TRACKER' : 'LIVE MODE / WAITING'}
+          {live ? 'LIVE NODE' : 'LIVE MODE / WAITING'}
           <Link to="/demo">DEMO</Link>
-          <Link to="/slimevr">SLIMEVR HOME ↗</Link>
         </div>
       </header>
       <main className="sports-content">
@@ -160,30 +167,42 @@ export function LiveMovementDashboard() {
           <div>
             <div className="eyebrow">HARDWARE SESSION / CHEST</div>
             <h1>Movement overview</h1>
-            <p>Real tracker orientation through SlimeVR.</p>
+            <p>Your movement, connected.</p>
           </div>
           <div className="sports-controls">
-            <label className="exercise-select">
-              TRACKER
-              <select
-                aria-label="Chest tracker"
-                value={selected ? trackerKey(selected) : ''}
-                onChange={(event) => {
-                  setSelectedKey(event.target.value);
-                  setAssignment(null);
-                  setCalibrationMessage('');
-                }}
-              >
-                <option value="">
-                  {available.length ? 'Choose tracker' : 'No tracker detected'}
-                </option>
-                {trackers.map(({ tracker }) => (
-                  <option key={trackerKey(tracker)} value={trackerKey(tracker)}>
-                    {trackerName(tracker)} / {TrackerStatus[tracker.status]}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <NodePicker
+              label="Chest node"
+              value={selected ? trackerKey(selected) : ''}
+              placeholder={
+                trackers.length ? 'Choose a node' : 'No nodes added yet'
+              }
+              onChange={(value) => {
+                setSelectedKey(value);
+                setAssignment(null);
+                setCalibrationMessage('');
+              }}
+              options={trackers.map(({ tracker }) => ({
+                value: trackerKey(tracker),
+                label: trackerName(tracker).replace(/^Tracker\s+/, 'Node '),
+                detail: !fresh
+                  ? 'Offline'
+                  : tracker.status === TrackerStatus.OK
+                    ? 'Online'
+                    : tracker.status === TrackerStatus.BUSY
+                      ? 'Starting'
+                      : tracker.status === TrackerStatus.ERROR
+                        ? 'Needs attention'
+                        : 'Offline',
+              }))}
+            />
+            <button
+              className="secondary-button"
+              onClick={() => setSetupOpen(!setupOpen)}
+              aria-expanded={setupOpen}
+              aria-controls="node-setup-content"
+            >
+              Connect nodes
+            </button>
             <button
               className="primary-button"
               onClick={assignChest}
@@ -206,7 +225,7 @@ export function LiveMovementDashboard() {
               disabled={!live || reset.disabled}
               onClick={() => {
                 setCalibrationMessage(
-                  'Stand upright and face forward while SlimeVR resets.'
+                  'Stand upright and face forward while your pose resets.'
                 );
                 reset.triggerReset();
               }}
@@ -217,14 +236,12 @@ export function LiveMovementDashboard() {
             </button>
           </div>
         </div>
+        <NodeSetup open={setupOpen} onToggle={() => setSetupOpen(!setupOpen)} />
         <div className="live-connection-note" role="status">
           <strong>{status}.</strong>{' '}
           {live
-            ? 'Chest is measured; the rest of the skeleton is estimated by SlimeVR.'
-            : 'Power on the tracker. ESP trackers need a Wi-Fi connection to this computer; USB is used for setup.'}
-          {isConnected && !available.length && (
-            <Link to="/onboarding/wifi-creds"> Open tracker setup ↗</Link>
-          )}
+            ? 'Chest is measured; the rest of the skeleton is estimated.'
+            : 'Turn on your node and connect to the same Wi-Fi as this computer. Use Connect nodes for first-time setup.'}
           {assignment && !assignedConfirmation && !assignmentPending && (
             <p>Assignment was not confirmed. Check the connection and retry.</p>
           )}
@@ -237,7 +254,7 @@ export function LiveMovementDashboard() {
                 <span className="panel-index">01 / LIVE MOVEMENT</span>
                 <h2>Skeleton tracking</h2>
               </div>
-              <span className="panel-tag">SLIMEVR VISUALIZER</span>
+              <span className="panel-tag">MOVEMENT VIEW</span>
             </div>
             <div className="sports-viewport">
               {skeletonLive ? (
@@ -271,7 +288,7 @@ export function LiveMovementDashboard() {
               </div>
             </div>
             <div className="viewport-footer">
-              <div>{fresh ? available.length : 0} TRACKERS CONNECTED</div>
+              <div>{fresh ? available.length : 0} NODES ONLINE</div>
               <div className="view-buttons">
                 <button
                   disabled={!skeletonLive}
@@ -316,8 +333,8 @@ export function LiveMovementDashboard() {
                   </div>
                   <span className="metric-note">
                     {selected?.rotationReferenceAdjusted
-                      ? 'SlimeVR adjusted'
-                      : 'Tracker orientation'}
+                      ? 'Aligned orientation'
+                      : 'Node orientation'}
                   </span>
                 </div>
               ))}
@@ -348,9 +365,7 @@ export function LiveMovementDashboard() {
         <footer className="sports-footer">
           MOTIONLAB / LIVE HARDWARE
           <span>
-            {isConnected
-              ? 'SlimeVR server connected'
-              : 'SlimeVR server disconnected'}
+            {isConnected ? 'Ready for your nodes' : 'Local service offline'}
           </span>
         </footer>
       </main>

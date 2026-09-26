@@ -268,7 +268,6 @@ export function SportsDashboard() {
         <div className="sports-header-right">
           <span className="live-dot" /> MOCK DATA{' '}
           <Link to="/">LIVE TRACKER</Link>
-          <Link to="/slimevr">SLIMEVR HOME ↗</Link>
         </div>
       </header>
 
@@ -279,7 +278,7 @@ export function SportsDashboard() {
               TRAINING SESSION <span> / </span> 001
             </div>
             <h1>Movement overview</h1>
-            <p>Real time biomechanics, built on SlimeVR motion tracking.</p>
+            <p>Explore your movement with a simulated training session.</p>
           </div>
           <div className="sports-controls">
             <label className="exercise-select">
@@ -338,7 +337,7 @@ export function SportsDashboard() {
                 <span className="panel-index">01 / LIVE MOVEMENT</span>
                 <h2>Skeleton tracking</h2>
               </div>
-              <span className="panel-tag">SLIMEVR VISUALIZER</span>
+              <span className="panel-tag">MOVEMENT VIEW</span>
             </div>
             <div className="sports-viewport">
               <SkeletonVisualizerWidget
@@ -728,8 +727,7 @@ export function SportsDashboard() {
           </section>
         )}
         <footer className="sports-footer">
-          MOTIONLAB / DEMO MODE{' '}
-          <span>Powered by the SlimeVR skeleton visualizer</span>
+          MOTIONLAB / DEMO MODE <span>MotionLab movement preview</span>
         </footer>
       </main>
 

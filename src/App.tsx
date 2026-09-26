@@ -1,219 +1,31 @@
 import { createContext, useEffect, useState } from 'react';
-import {
-  HashRouter as Router,
-  Outlet,
-  Route,
-  Routes,
-  useLocation,
-} from 'react-router-dom';
-import { Home } from './components/home/Home';
-import { MainLayout } from './components/MainLayout';
+import { HashRouter as Router, Navigate, useLocation } from 'react-router-dom';
 import { AppContextProvider } from './components/providers/AppContext';
-import { GeneralSettings } from './components/settings/pages/GeneralSettings';
-import { Serial } from './components/settings/pages/Serial';
-import { SettingsLayout } from './components/settings/SettingsLayout';
 import {
   useProvideWebsocketApi,
   WebSocketApiContext,
 } from './hooks/websocket-api';
-
 import { OnboardingContextProvider } from './components/onboarding/OnboardingContextProvider';
-import { OnboardingLayout } from './components/onboarding/OnboardingLayout';
-import { AutomaticProportionsPage } from './components/onboarding/pages/body-proportions/AutomaticProportions';
-import { ManualProportionsPage } from './components/onboarding/pages/body-proportions/ManualProportions';
-import { ConnectTrackersPage } from './components/onboarding/pages/ConnectTracker';
-import { HomePage } from './components/onboarding/pages/Home';
-import { ErrorCollectingConsentPage } from './components/onboarding/pages/ErrorCollectingConsent';
-import { AutomaticMountingPage } from './components/onboarding/pages/mounting/AutomaticMounting';
-import { ManualMountingPage } from './components/onboarding/pages/mounting/ManualMounting';
-import { TrackersAssignPage } from './components/onboarding/pages/trackers-assign/TrackerAssignment';
-import { WifiCredsPage } from './components/onboarding/pages/WifiCreds';
-import { DonglePage } from './components/onboarding/pages/Dongle';
 import { ConfigContextProvider } from './components/providers/ConfigContext';
-import { SerialDetectionModal } from './components/SerialDetectionModal';
-import { VRCOSCSettings } from './components/settings/pages/VRCOSCSettings';
-import { TopBar } from './components/TopBar';
-import { TrackerSettingsPage } from './components/tracker/TrackerSettings';
-import { OSCRouterSettings } from './components/settings/pages/OSCRouterSettings';
-import { VMCSettings } from './components/settings/pages/VMCSettings';
-import { MountingChoose } from './components/onboarding/pages/mounting/MountingChoose';
-import { VersionUpdateModal } from './components/VersionUpdateModal';
 import semver from 'semver';
-import { useBreakpoint } from './hooks/breakpoint';
-import { VRModePage } from './components/vr-mode/VRModePage';
-import { InterfaceSettings } from './components/settings/pages/InterfaceSettings';
 import { error, log } from './utils/logging';
-import { FirmwareToolSettings } from './components/firmware-tool/FirmwareTool';
-import { AppLayout } from './AppLayout';
 import { Preload } from './components/Preload';
-import { UnknownDeviceModal } from './components/UnknownDeviceModal';
-import { useDiscordPresence } from './hooks/discord-presence';
-import { withSentryReactRouterV6Routing } from '@sentry/react';
-import { ScaledProportionsPage } from './components/onboarding/pages/body-proportions/ScaledProportions';
-import { AdvancedSettings } from './components/settings/pages/AdvancedSettings';
-import { FirmwareUpdate } from './components/firmware-update/FirmwareUpdate';
-import { ConnectionLost } from './components/onboarding/pages/ConnectionLost';
-import { VRCWarningsPage } from './components/vrc/VRCWarningsPage';
-import { StayAlignedSetup } from './components/onboarding/pages/stay-aligned/StayAlignedSetup';
 import { TrackingChecklistProvider } from './components/tracking-checklist/TrackingChecklistProvider';
-import { HomeScreenSettings } from './components/settings/pages/HomeScreenSettings';
-import { ChecklistPage } from './components/tracking-checklist/TrackingChecklist';
-import { QuizSlimeSetQuestion } from './components/onboarding/pages/quiz/SlimeSetQuestion';
-import { QuizUsageQuestion } from './components/onboarding/pages/quiz/UsageQuestion';
-import { QuizRuntimeQuestion } from './components/onboarding/pages/quiz/RuntimeQuestion';
-import { QuizMocapPosQuestion } from './components/onboarding/pages/quiz/MocapPreferencesQuestions';
 import { ElectronContextC, provideElectron } from './hooks/electron';
 import { AppLocalizationProvider } from './i18n/config';
-import { openUrl } from './hooks/crossplatform';
-import { UdevRulesModal } from './components/onboarding/UdevRulesModal';
 import { SportsDashboard } from './components/sports/SportsDashboard';
 import { LiveMovementDashboard } from './components/sports/LiveMovementDashboard';
-
 export const GH_REPO = 'SlimeVR/SlimeVR-Server';
 export const VersionContext = createContext('');
 export const DOCS_SITE = 'https://docs.slimevr.dev';
 export const SLIMEVR_DISCORD = 'https://discord.gg/slimevr';
 
-const SentryRoutes = withSentryReactRouterV6Routing(Routes);
-
-function Layout() {
-  const { isMobile } = useBreakpoint('mobile');
-  useDiscordPresence();
-
-  return (
-    <>
-      <SerialDetectionModal />
-      <VersionUpdateModal />
-      <UnknownDeviceModal />
-      <UdevRulesModal />
-      <SentryRoutes>
-        <Route element={<AppLayout />}>
-          <Route
-            path="/"
-            element={
-              <MainLayout isMobile={isMobile} full>
-                <Home />
-              </MainLayout>
-            }
-          />
-          <Route
-            path="/slimevr"
-            element={
-              <MainLayout isMobile={isMobile} full>
-                <Home />
-              </MainLayout>
-            }
-          />
-          <Route
-            path="/firmware-update"
-            element={
-              <MainLayout isMobile={isMobile}>
-                <FirmwareUpdate />
-              </MainLayout>
-            }
-          />
-          <Route
-            path="/vr-mode"
-            element={
-              <MainLayout isMobile={isMobile} full>
-                <VRModePage />
-              </MainLayout>
-            }
-          />
-          <Route
-            path="/checklist"
-            element={
-              <MainLayout isMobile={isMobile}>
-                <ChecklistPage />
-              </MainLayout>
-            }
-          />
-          <Route
-            path="/tracker/:trackernum/:deviceid"
-            element={
-              <MainLayout background={false} isMobile={isMobile}>
-                <TrackerSettingsPage />
-              </MainLayout>
-            }
-          />
-          <Route
-            path="/vrc-warnings"
-            element={
-              <MainLayout isMobile={isMobile}>
-                <VRCWarningsPage />
-              </MainLayout>
-            }
-          />
-          <Route
-            path="/settings"
-            element={
-              <SettingsLayout>
-                <Outlet />
-              </SettingsLayout>
-            }
-          >
-            <Route path="firmware-tool" element={<FirmwareToolSettings />} />
-            <Route path="trackers" element={<GeneralSettings />} />
-            <Route path="serial" element={<Serial />} />
-            <Route path="osc/router" element={<OSCRouterSettings />} />
-            <Route path="osc/vrchat" element={<VRCOSCSettings />} />
-            <Route path="osc/vmc" element={<VMCSettings />} />
-            <Route path="interface" element={<InterfaceSettings />} />
-            <Route path="interface/home" element={<HomeScreenSettings />} />
-            <Route path="advanced" element={<AdvancedSettings />} />
-          </Route>
-          <Route
-            path="/onboarding"
-            element={
-              <OnboardingLayout>
-                <Outlet />
-              </OnboardingLayout>
-            }
-          >
-            <Route path="home" element={<HomePage />} />
-            <Route
-              path="error-collecting-consent"
-              element={<ErrorCollectingConsentPage />}
-            />
-            <Route path="wifi-creds" element={<WifiCredsPage />} />
-            <Route path="quiz/slime-set" element={<QuizSlimeSetQuestion />} />
-            <Route path="quiz/usage" element={<QuizUsageQuestion />} />
-            <Route path="quiz/runtime" element={<QuizRuntimeQuestion />} />
-            <Route path="quiz/mocap-pos" element={<QuizMocapPosQuestion />} />
-            <Route path="dongle" element={<DonglePage />} />
-            <Route path="firmware-tool" element={<FirmwareToolSettings />} />
-            <Route path="connect-trackers" element={<ConnectTrackersPage />} />
-            <Route path="trackers-assign" element={<TrackersAssignPage />} />
-            <Route path="mounting/choose" element={<MountingChoose />} />
-            <Route path="mounting/auto" element={<AutomaticMountingPage />} />
-            <Route path="mounting/manual" element={<ManualMountingPage />} />
-            <Route
-              path="body-proportions/auto"
-              element={<AutomaticProportionsPage />}
-            />
-            <Route
-              path="body-proportions/manual"
-              element={<ManualProportionsPage />}
-            />
-            <Route
-              path="body-proportions/scaled"
-              element={<ScaledProportionsPage />}
-            />
-            <Route path="stay-aligned" element={<StayAlignedSetup />} />
-          </Route>
-          <Route path="*" element={<TopBar />} />
-        </Route>
-      </SentryRoutes>
-    </>
-  );
-}
-
-function AppSurface({ isConnected }: { isConnected: boolean }) {
+function AppSurface() {
   const { pathname } = useLocation();
   if (pathname === '/' || pathname === '/sports')
     return <LiveMovementDashboard />;
   if (pathname === '/demo') return <SportsDashboard />;
-  return isConnected ? <Layout /> : <ConnectionLost />;
+  return <Navigate to="/" replace />;
 }
 
 export default function App() {
@@ -309,17 +121,6 @@ export default function App() {
     }, []);
   }
 
-  useEffect(() => {
-    function onKeyboard(ev: KeyboardEvent) {
-      if (ev.key === 'F1') {
-        return openUrl(DOCS_SITE);
-      }
-    }
-
-    document.addEventListener('keyup', onKeyboard);
-    return () => document.removeEventListener('keyup', onKeyboard);
-  }, []);
-
   return (
     <ElectronContextC.Provider value={electron}>
       <AppLocalizationProvider>
@@ -332,7 +133,7 @@ export default function App() {
                     <VersionContext.Provider value={updateFound}>
                       <div className="h-full w-full text-standard bg-background-80 text-background-10">
                         <Preload />
-                        <AppSurface isConnected={websocketAPI.isConnected} />
+                        <AppSurface />
                       </div>
                     </VersionContext.Provider>
                   </TrackingChecklistProvider>
