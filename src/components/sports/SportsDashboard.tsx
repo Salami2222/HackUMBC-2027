@@ -249,36 +249,41 @@ export function SportsDashboard() {
     `${value >= 0 ? '+' : ''}${format(value, digits)}${unit} from baseline`;
 
   return (
-    <div className="sports-app">
+    <div className="sports-app demo-dashboard">
       <header className="sports-header">
         <div className="sports-brand">
-          <div className="brand-mark">
-            M<span>•</span>
-          </div>
+          <div className="brand-mark">M</div>
           <div>
-            <strong>MOTIONLAB</strong>
-            <small>PERFORMANCE ANALYSIS</small>
+            <strong>MotionLab</strong>
+            <small>Movement studio</small>
           </div>
         </div>
-        <div className="sports-header-center">
-          <span className="header-divider" />
-          <span>Movement intelligence</span>
-          <span className="header-divider" />
-        </div>
+        <div className="sports-header-center">Training demo</div>
         <div className="sports-header-right">
-          <span className="live-dot" /> MOCK DATA{' '}
-          <Link to="/">LIVE TRACKER</Link>
+          <span className="live-dot" />
+          <span>Simulated data</span>
+          <Link to="/">Live tracker</Link>
         </div>
       </header>
 
       <main className="sports-content">
         <div className="sports-heading">
           <div>
-            <div className="eyebrow">
-              TRAINING SESSION <span> / </span> 001
+            <div className="eyebrow">Training demo / Session 001</div>
+            <h1>Your movement, measured.</h1>
+            <p>Build a warm-up baseline, then follow each training rep.</p>
+          </div>
+        </div>
+        <section
+          className="sports-panel control-panel"
+          aria-label="Session controls"
+        >
+          <div className="control-panel-intro">
+            <div>
+              <span className="panel-index">SESSION SETUP</span>
+              <h2>Training controls</h2>
             </div>
-            <h1>Movement overview</h1>
-            <p>Explore your movement with a simulated training session.</p>
+            <p>This session uses simulated movement and tracker data.</p>
           </div>
           <div className="sports-controls">
             <label className="exercise-select">
@@ -328,7 +333,7 @@ export function SportsDashboard() {
               <span>↗</span>
             </button>
           </div>
-        </div>
+        </section>
 
         <section className="sports-hero">
           <div className="sports-panel viewport-panel">

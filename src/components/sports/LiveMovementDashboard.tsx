@@ -144,30 +144,43 @@ export function LiveMovementDashboard() {
   };
 
   return (
-    <div className="sports-app">
+    <div className="sports-app live-dashboard">
       <header className="sports-header">
         <div className="sports-brand">
-          <div className="brand-mark">
-            M<span>•</span>
-          </div>
+          <div className="brand-mark">M</div>
           <div>
-            <strong>MOTIONLAB</strong>
-            <small>PERFORMANCE ANALYSIS</small>
+            <strong>MotionLab</strong>
+            <small>Movement studio</small>
           </div>
         </div>
-        <div className="sports-header-center">Movement intelligence</div>
+        <div className="sports-header-center">Live tracking</div>
         <div className="sports-header-right">
           <span className={live ? 'live-dot' : ''} />
-          {live ? 'LIVE NODE' : 'LIVE MODE / WAITING'}
-          <Link to="/demo">DEMO</Link>
+          <span>{live ? 'Tracking live' : 'Awaiting connection'}</span>
+          <Link to="/demo">Open demo</Link>
         </div>
       </header>
       <main className="sports-content">
         <div className="sports-heading">
           <div>
-            <div className="eyebrow">HARDWARE SESSION / CHEST</div>
-            <h1>Movement overview</h1>
-            <p>Your movement, connected.</p>
+            <div className="eyebrow">Live tracking / Chest node</div>
+            <h1>Movement, in focus.</h1>
+            <p>Connect a node to see your chest orientation in real time.</p>
+          </div>
+        </div>
+        <section
+          className="sports-panel control-panel"
+          aria-label="Session controls"
+        >
+          <div className="control-panel-intro">
+            <div>
+              <span className="panel-index">SETUP</span>
+              <h2>Session controls</h2>
+            </div>
+            <p>
+              Choose a node, assign it to your chest, then reset your upright
+              pose.
+            </p>
           </div>
           <div className="sports-controls">
             <NodePicker
@@ -235,7 +248,7 @@ export function LiveMovementDashboard() {
                 : 'Reset upright pose'}
             </button>
           </div>
-        </div>
+        </section>
         <NodeSetup open={setupOpen} onToggle={() => setSetupOpen(!setupOpen)} />
         <div className="live-connection-note" role="status">
           <strong>{status}.</strong>{' '}
