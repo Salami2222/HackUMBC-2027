@@ -267,6 +267,7 @@ export function SportsDashboard() {
         </div>
         <div className="sports-header-right">
           <span className="live-dot" /> MOCK DATA{' '}
+          <Link to="/">LIVE TRACKER</Link>
           <Link to="/slimevr">SLIMEVR HOME ↗</Link>
         </div>
       </header>

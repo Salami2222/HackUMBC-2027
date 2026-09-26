@@ -67,6 +67,7 @@ import { AppLocalizationProvider } from './i18n/config';
 import { openUrl } from './hooks/crossplatform';
 import { UdevRulesModal } from './components/onboarding/UdevRulesModal';
 import { SportsDashboard } from './components/sports/SportsDashboard';
+import { LiveMovementDashboard } from './components/sports/LiveMovementDashboard';
 
 export const GH_REPO = 'SlimeVR/SlimeVR-Server';
 export const VersionContext = createContext('');
@@ -209,7 +210,9 @@ function Layout() {
 
 function AppSurface({ isConnected }: { isConnected: boolean }) {
   const { pathname } = useLocation();
-  if (pathname === '/' || pathname === '/sports') return <SportsDashboard />;
+  if (pathname === '/' || pathname === '/sports')
+    return <LiveMovementDashboard />;
+  if (pathname === '/demo') return <SportsDashboard />;
   return isConnected ? <Layout /> : <ConnectionLost />;
 }
 
