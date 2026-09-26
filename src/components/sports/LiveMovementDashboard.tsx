@@ -163,8 +163,8 @@ export function LiveMovementDashboard() {
       <main className="sports-content">
         <div className="sports-heading">
           <div>
-            <div className="eyebrow">Live tracking / Chest node</div>
-            <h1>Movement, in focus.</h1>
+            <div className="eyebrow">Hardware overview</div>
+            <h1>Live movement</h1>
             <p>Connect a node to see your chest orientation in real time.</p>
           </div>
         </div>
@@ -264,10 +264,9 @@ export function LiveMovementDashboard() {
           <div className="sports-panel viewport-panel">
             <div className="panel-top">
               <div>
-                <span className="panel-index">01 / LIVE MOVEMENT</span>
-                <h2>Skeleton tracking</h2>
+                <span className="panel-index">MOVEMENT</span>
+                <h2>Skeleton view</h2>
               </div>
-              <span className="panel-tag">MOVEMENT VIEW</span>
             </div>
             <div className="sports-viewport">
               {skeletonLive ? (
@@ -327,8 +326,8 @@ export function LiveMovementDashboard() {
           <div className="sports-panel metrics-panel">
             <div className="panel-top">
               <div>
-                <span className="panel-index">02 / CHEST ORIENTATION</span>
-                <h2>Live movement</h2>
+                <span className="panel-index">MEASUREMENTS</span>
+                <h2>Chest orientation</h2>
               </div>
               <span className="panel-tag">
                 {live ? 'STREAMING' : 'WAITING'}

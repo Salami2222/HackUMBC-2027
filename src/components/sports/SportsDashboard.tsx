@@ -269,8 +269,8 @@ export function SportsDashboard() {
       <main className="sports-content">
         <div className="sports-heading">
           <div>
-            <div className="eyebrow">Training demo / Session 001</div>
-            <h1>Your movement, measured.</h1>
+            <div className="eyebrow">Simulated session</div>
+            <h1>Training overview</h1>
             <p>Build a warm-up baseline, then follow each training rep.</p>
           </div>
         </div>
@@ -339,10 +339,9 @@ export function SportsDashboard() {
           <div className="sports-panel viewport-panel">
             <div className="panel-top">
               <div>
-                <span className="panel-index">01 / LIVE MOVEMENT</span>
-                <h2>Skeleton tracking</h2>
+                <span className="panel-index">MOVEMENT</span>
+                <h2>Skeleton view</h2>
               </div>
-              <span className="panel-tag">MOVEMENT VIEW</span>
             </div>
             <div className="sports-viewport">
               <SkeletonVisualizerWidget
@@ -396,7 +395,7 @@ export function SportsDashboard() {
           <div className="sports-panel metrics-panel">
             <div className="panel-top">
               <div>
-                <span className="panel-index">02 / PERFORMANCE</span>
+                <span className="panel-index">MEASUREMENTS</span>
                 <h2>Live metrics</h2>
               </div>
               <span className="panel-tag">{exercise.toUpperCase()}</span>
@@ -543,10 +542,9 @@ export function SportsDashboard() {
           <div className="sports-panel trend-panel">
             <div className="panel-top">
               <div>
-                <span className="panel-index">03 / SESSION TREND</span>
+                <span className="panel-index">SESSION TREND</span>
                 <h2>Form consistency</h2>
               </div>
-              <span className="panel-tag">REP BY REP</span>
             </div>
             <div className="chart-tabs">
               {(Object.keys(CHARTS) as ChartMetric[]).map((key) => (
@@ -571,7 +569,7 @@ export function SportsDashboard() {
             <div className="sports-panel baseline-panel">
               <div className="panel-top">
                 <div>
-                  <span className="panel-index">04 / BENCHMARK</span>
+                  <span className="panel-index">BENCHMARK</span>
                   <h2>Baseline comparison</h2>
                 </div>
               </div>
@@ -636,7 +634,7 @@ export function SportsDashboard() {
             onClick={() => setTrackersOpen(!trackersOpen)}
           >
             <span>
-              <span className="panel-index">05 / HARDWARE</span>
+              <span className="panel-index">TRACKERS</span>
               <h2>
                 Tracker status <small>11 simulated segments</small>
               </h2>

@@ -1,9 +1,9 @@
 .sports-app {
-  --ml-bg: #0d0c18;
-  --ml-surface: #181727;
+  --ml-bg: #11101a;
+  --ml-surface: #1c1a2b;
   --ml-surface-raised: #211f35;
   --ml-surface-soft: #1c1a2d;
-  --ml-border: #333049;
+  --ml-border: #363247;
   --ml-border-strong: #48415f;
   --ml-text: #f3f0fb;
   --ml-muted: #aaa5bf;
@@ -13,9 +13,7 @@
 
   min-height: 100vh;
   color: var(--ml-text);
-  background:
-    radial-gradient(circle at 85% 0%, #32234d55 0, transparent 34rem),
-    var(--ml-bg);
+  background: var(--ml-bg);
   font-family: 'Lexend', 'Poppins', sans-serif;
   font-size: 13px;
   letter-spacing: -0.015em;
@@ -55,8 +53,8 @@
     display: flex;
     align-items: center;
     gap: 32px;
-    border-bottom: 1px solid #28253b;
-    background: #11101ed9;
+    border-bottom: 1px solid var(--ml-border);
+    background: var(--ml-bg);
   }
 
   .sports-brand {
@@ -69,14 +67,11 @@
   .brand-mark {
     display: grid;
     place-items: center;
-    width: 38px;
+    width: 30px;
     height: 38px;
     flex: none;
-    border-radius: 11px;
-    background: linear-gradient(145deg, #c1acff, #8467d9);
-    box-shadow: 0 6px 20px #8064dd38;
-    color: #181128;
-    font-size: 20px;
+    color: var(--ml-accent-soft);
+    font-size: 27px;
     font-weight: 800;
     letter-spacing: -0.09em;
   }
@@ -127,15 +122,13 @@
 
     a {
       margin-left: 14px;
-      padding: 9px 13px;
-      border-radius: 8px;
-      color: var(--ml-text);
-      background: var(--ml-surface-raised);
+      padding: 9px 0;
+      color: var(--ml-accent-soft);
       text-decoration: none;
-      transition: background 0.2s;
+      transition: color 0.2s;
 
       &:hover {
-        background: #342d4e;
+        color: var(--ml-text);
       }
     }
   }
@@ -152,13 +145,13 @@
   }
 
   .sports-content {
-    max-width: 1504px;
+    max-width: 1456px;
     margin: 0 auto;
-    padding: 42px 32px 36px;
+    padding: 56px 48px 48px;
   }
 
   .sports-heading {
-    margin-bottom: 28px;
+    margin-bottom: 42px;
 
     h1 {
       margin: 11px 0 9px;
@@ -186,15 +179,13 @@
   }
 
   .sports-panel {
-    overflow: hidden;
-    border-radius: 16px;
-    background: var(--ml-surface);
-    box-shadow: 0 12px 32px #05040f30;
+    background: transparent;
   }
 
   .control-panel {
-    margin-bottom: 14px;
-    padding: 22px 24px 24px;
+    margin-bottom: 0;
+    padding: 28px 0 34px;
+    border-top: 1px solid var(--ml-border);
   }
 
   .control-panel-intro {
@@ -242,10 +233,10 @@
     flex-direction: column;
     justify-content: center;
     min-width: 170px;
-    padding: 5px 13px;
-    border-radius: 9px;
+    padding: 5px 3px;
+    border-bottom: 1px solid var(--ml-border-strong);
     color: var(--ml-subtle);
-    background: #29263c;
+    background: transparent;
     font-size: 9px;
     font-weight: 600;
     letter-spacing: 0.08em;
@@ -273,30 +264,29 @@
     min-height: 44px;
     padding: 0 16px;
     border: 0;
-    border-radius: 9px;
-    color: var(--ml-text);
-    background: #29263c;
+    border-radius: 4px;
+    color: var(--ml-accent-soft);
+    background: transparent;
     font-size: 12px;
     font-weight: 550;
     white-space: nowrap;
-    transition:
-      background 0.2s,
-      transform 0.2s;
+    transition: color 0.2s;
 
     &:not(:disabled):hover {
-      background: #39324f;
-      transform: translateY(-1px);
+      color: var(--ml-text);
     }
   }
 
   .primary-button {
     min-width: 142px;
     color: #1c1530;
-    background: linear-gradient(135deg, #c4aeff, #a586f5);
+    background: #b8a2f8;
     font-weight: 650;
+    transition: background 0.2s;
 
     &:not(:disabled):hover {
-      background: linear-gradient(135deg, #d6c6ff, #b699ff);
+      color: #1c1530;
+      background: #d0bfff;
     }
 
     span {
@@ -312,11 +302,10 @@
 
   .live-connection-note {
     position: relative;
-    margin-bottom: 16px;
-    padding: 14px 18px;
-    border-radius: 12px;
+    margin-bottom: 52px;
+    padding: 9px 0;
     color: var(--ml-muted);
-    background: linear-gradient(90deg, #2b2243, #1d1a30 70%);
+    background: transparent;
     font-size: 12px;
     line-height: 1.6;
 
@@ -337,7 +326,7 @@
   .sports-hero {
     display: grid;
     grid-template-columns: minmax(0, 1.16fr) minmax(0, 1fr);
-    gap: 16px;
+    gap: 64px;
   }
 
   .panel-top {
@@ -345,7 +334,7 @@
     justify-content: space-between;
     align-items: start;
     gap: 12px;
-    padding: 22px 24px 19px;
+    padding: 0 0 24px;
 
     h2 {
       margin: 5px 0 0;
@@ -356,10 +345,9 @@
   }
 
   .panel-tag {
-    padding: 7px 10px;
-    border-radius: 7px;
-    color: var(--ml-accent-soft);
-    background: #2b2443;
+    padding: 4px 0;
+    color: var(--ml-muted);
+    background: transparent;
     font-size: 9px;
     font-weight: 650;
     letter-spacing: 0.07em;
@@ -376,14 +364,12 @@
     position: relative;
     flex: 1;
     min-height: 410px;
-    background:
-      linear-gradient(#a58ad30b 1px, transparent 1px),
-      linear-gradient(90deg, #a58ad30b 1px, transparent 1px),
-      radial-gradient(circle at 50% 42%, #312743 0, #211c32 42%, #151421 100%);
-    background-size:
-      32px 32px,
-      32px 32px,
-      auto;
+    background: radial-gradient(
+      ellipse at 50% 48%,
+      #29223b 0,
+      #1a1726 54%,
+      transparent 80%
+    );
 
     canvas {
       outline: 0;
@@ -393,14 +379,13 @@
   .viewport-status {
     position: absolute;
     top: 17px;
-    left: 19px;
+    left: 0;
     display: flex;
     align-items: center;
     gap: 9px;
-    padding: 8px 10px;
-    border-radius: 7px;
+    padding: 8px 0;
     color: #e3daf6;
-    background: #171424c7;
+    background: transparent;
     font-size: 9px;
     font-weight: 650;
     letter-spacing: 0.08em;
@@ -426,7 +411,7 @@
     align-items: center;
     gap: 12px;
     min-height: 57px;
-    padding: 10px 20px;
+    padding: 10px 0;
     border-top: 1px solid var(--ml-border);
     color: var(--ml-muted);
     font-size: 10px;
@@ -441,23 +426,19 @@
 
   .view-buttons {
     display: flex;
-    gap: 3px;
-    padding: 3px;
-    border-radius: 8px;
-    background: #262338;
+    gap: 10px;
+    background: transparent;
 
     button {
       padding: 6px 10px;
       border: 0;
-      border-radius: 5px;
       color: var(--ml-muted);
       background: transparent;
       font-size: 10px;
       font-weight: 600;
 
       &:not(:disabled):hover {
-        color: var(--ml-text);
-        background: var(--ml-surface-raised);
+        color: var(--ml-accent-soft);
       }
     }
   }
@@ -512,16 +493,16 @@
   .metrics-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 11px;
-    padding: 0 20px 20px;
+    column-gap: 24px;
+    row-gap: 4px;
   }
 
   .sports-metric {
     min-width: 0;
     min-height: 112px;
-    padding: 17px 15px;
-    border-radius: 12px;
-    background: #242139;
+    padding: 18px 0 20px;
+    border-top: 1px solid var(--ml-border);
+    background: transparent;
   }
 
   .metric-label {
@@ -557,10 +538,10 @@
   }
 
   .live-measurement-note {
-    margin: auto 20px 20px;
-    padding: 17px 18px;
-    border-radius: 10px;
-    background: #1d1a2e;
+    margin: auto 0 0;
+    padding: 19px 0 0;
+    border-top: 1px solid var(--ml-border);
+    background: transparent;
     color: var(--ml-muted);
     font-size: 11px;
     line-height: 1.6;
@@ -582,10 +563,10 @@
     justify-content: space-between;
     align-items: end;
     gap: 15px;
-    margin: 0 20px 19px;
-    padding: 17px 19px;
-    border-radius: 10px;
-    background: linear-gradient(105deg, #32264e, #241f3a);
+    margin: 0 0 19px;
+    padding: 8px 0 20px;
+    border-bottom: 1px solid var(--ml-border);
+    background: transparent;
 
     span,
     .score-row span {
@@ -598,7 +579,7 @@
     strong {
       display: block;
       margin-top: 3px;
-      font-size: 42px;
+      font-size: 50px;
       font-weight: 600;
       line-height: 1.05;
       letter-spacing: -0.08em;
@@ -637,7 +618,8 @@
     align-items: end;
     gap: 12px;
     margin-top: auto;
-    padding: 0 22px 21px;
+    padding: 19px 0 0;
+    border-top: 1px solid var(--ml-border);
 
     span {
       display: block;
@@ -665,8 +647,10 @@
     justify-content: space-between;
     align-items: center;
     gap: 25px;
-    margin-top: 16px;
-    padding: 19px 23px;
+    margin-top: 64px;
+    padding: 24px 0;
+    border-top: 1px solid var(--ml-border);
+    border-bottom: 1px solid var(--ml-border);
 
     h2 {
       margin: 5px 0;
@@ -710,8 +694,8 @@
   .sports-lower {
     display: grid;
     grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
-    gap: 16px;
-    margin-top: 16px;
+    gap: 64px;
+    margin-top: 64px;
   }
 
   .trend-panel {
@@ -720,23 +704,23 @@
 
   .chart-tabs {
     display: flex;
-    gap: 7px;
-    margin: 0 24px;
+    gap: 22px;
+    margin: 0;
     overflow-x: auto;
 
     button {
-      padding: 8px 12px;
+      padding: 8px 0 10px;
       border: 0;
-      border-radius: 7px;
+      border-bottom: 2px solid transparent;
       color: var(--ml-muted);
-      background: #211f32;
+      background: transparent;
       font-size: 10px;
       white-space: nowrap;
 
       &:not(:disabled):hover,
       &.active {
         color: var(--ml-text);
-        background: #3a2f58;
+        border-bottom-color: var(--ml-accent);
       }
     }
   }
@@ -744,7 +728,7 @@
   .sports-chart {
     position: relative;
     height: 220px;
-    margin: 15px 25px 0;
+    margin: 15px 0 0;
 
     svg {
       width: 100%;
@@ -791,7 +775,7 @@
     display: flex;
     justify-content: space-between;
     gap: 12px;
-    padding: 2px 24px 19px 65px;
+    padding: 2px 0 19px 42px;
     color: var(--ml-subtle);
     font-size: 9px;
     letter-spacing: 0.07em;
@@ -805,14 +789,14 @@
   .sports-side-stack {
     display: grid;
     grid-template-rows: auto 1fr;
-    gap: 16px;
+    gap: 42px;
   }
 
   .baseline-panel {
-    padding-bottom: 14px;
+    padding-bottom: 0;
 
     p {
-      margin: 0 24px 14px;
+      margin: 0 0 14px;
       color: var(--ml-muted);
       font-size: 11px;
       line-height: 1.5;
@@ -823,7 +807,7 @@
     display: flex;
     justify-content: space-between;
     gap: 12px;
-    margin: 0 24px;
+    margin: 0;
     padding: 10px 0;
     border-top: 1px solid var(--ml-border);
     color: var(--ml-muted);
@@ -841,11 +825,12 @@
     display: flex;
     align-items: center;
     gap: 17px;
-    padding: 22px 23px;
-    background: #211c36;
+    padding: 21px 0 0;
+    border-top: 1px solid var(--ml-border);
+    background: transparent;
 
     &.has-alert {
-      background: #302136;
+      color: var(--ml-accent-soft);
     }
 
     h3 {
@@ -865,18 +850,18 @@
   .insight-icon {
     display: grid;
     place-items: center;
-    width: 39px;
+    width: 28px;
     height: 39px;
     flex: none;
-    border-radius: 11px;
     color: var(--ml-accent-soft);
-    background: #35284f;
-    font-size: 21px;
+    background: transparent;
+    font-size: 25px;
   }
 
   .trackers-panel,
   .summary-panel {
-    margin-top: 16px;
+    margin-top: 64px;
+    border-top: 1px solid var(--ml-border);
   }
 
   .tracker-toggle {
@@ -885,7 +870,7 @@
     align-items: center;
     gap: 18px;
     width: 100%;
-    padding: 18px 23px;
+    padding: 23px 0;
     border: 0;
     color: var(--ml-text);
     background: transparent;
@@ -916,17 +901,16 @@
   .tracker-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1px;
-    border-top: 1px solid var(--ml-border);
-    background: var(--ml-border);
+    column-gap: 24px;
 
     > div {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 15px 18px;
+      padding: 15px 0;
+      border-top: 1px solid var(--ml-border);
       color: var(--ml-muted);
-      background: var(--ml-surface);
+      background: transparent;
       font-size: 11px;
     }
 
@@ -941,12 +925,12 @@
   .summary-stats {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 8px;
-    padding: 0 20px 20px;
+    gap: 20px;
+    padding: 0 0 24px;
 
     .sports-metric {
       min-height: 92px;
-      padding: 15px 12px;
+      padding: 15px 0;
     }
 
     .metric-value {
@@ -956,7 +940,7 @@
 
   .summary-table-wrap {
     overflow-x: auto;
-    padding: 0 24px 24px;
+    padding: 0 0 24px;
   }
 
   .summary-panel {
@@ -1020,11 +1004,11 @@
   .node-input input {
     width: 100%;
     min-height: 44px;
-    padding: 10px 12px;
+    padding: 10px 3px;
     border: 0;
-    border-radius: 9px;
+    border-bottom: 1px solid var(--ml-border-strong);
     color: var(--ml-text);
-    background: #29263c;
+    background: transparent;
     text-align: left;
   }
 
@@ -1034,7 +1018,7 @@
     gap: 12px;
 
     &:not(:disabled):hover {
-      background: #39324f;
+      border-bottom-color: var(--ml-accent);
     }
   }
 
@@ -1092,7 +1076,8 @@
 
   .node-setup {
     overflow: visible;
-    margin-bottom: 14px;
+    margin-bottom: 20px;
+    border-top: 1px solid var(--ml-border);
   }
 
   .node-setup-toggle {
@@ -1101,9 +1086,8 @@
     align-items: center;
     gap: 20px;
     width: 100%;
-    padding: 17px 23px;
+    padding: 20px 0;
     border: 0;
-    border-radius: 14px 14px 0 0;
     color: var(--ml-text);
     background: transparent;
     text-align: left;
@@ -1125,7 +1109,7 @@
     display: grid;
     grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
     gap: 36px;
-    padding: 24px;
+    padding: 24px 0;
     border-top: 1px solid var(--ml-border);
   }
 
@@ -1147,10 +1131,9 @@
     }
 
     .node-setup-hint {
-      padding: 12px 14px;
-      border-left: 2px solid var(--ml-accent);
-      border-radius: 4px;
-      background: var(--ml-surface-raised);
+      padding: 8px 0;
+      color: var(--ml-accent-soft);
+      background: transparent;
     }
   }
 
@@ -1189,17 +1172,15 @@
   }
 
   .node-setup-status {
-    padding: 12px 23px;
-    border-top: 1px solid var(--ml-border);
-    border-radius: 0 0 14px 14px;
+    padding: 0 0 18px;
     color: var(--ml-muted);
-    background: #1d1b2e;
+    background: transparent;
     font-size: 11px;
     line-height: 1.6;
   }
 
   .node-discovery {
-    padding: 0 23px 16px;
+    padding: 0 0 16px;
 
     > div {
       display: flex;
@@ -1273,6 +1254,7 @@
     .sports-hero,
     .sports-lower {
       grid-template-columns: 1fr;
+      gap: 52px;
     }
 
     .viewport-panel {
@@ -1325,15 +1307,15 @@
     }
 
     .sports-content {
-      padding: 29px 16px 30px;
+      padding: 36px 20px 30px;
     }
 
     .sports-heading {
-      margin-bottom: 22px;
+      margin-bottom: 34px;
     }
 
     .control-panel {
-      padding: 19px 17px;
+      padding: 24px 0 30px;
     }
 
     .control-panel-intro {
@@ -1362,7 +1344,7 @@
     }
 
     .panel-top {
-      padding: 19px 18px;
+      padding: 0 0 21px;
     }
 
     .viewport-panel {
@@ -1374,19 +1356,18 @@
     }
 
     .viewport-footer {
-      padding: 10px 15px;
+      padding: 10px 0;
       font-size: 9px;
     }
 
     .metrics-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-      padding: 0 15px 15px;
+      gap: 0 18px;
     }
 
     .sports-metric {
       min-height: 104px;
-      padding: 15px 12px;
+      padding: 15px 0;
     }
 
     .metric-value {
@@ -1394,7 +1375,7 @@
     }
 
     .live-measurement-note {
-      margin: 0 15px 15px;
+      margin: 0;
     }
 
     .personal-baseline-panel {
@@ -1412,19 +1393,14 @@
 
     .summary-stats {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      padding: 0 15px 15px;
-    }
-
-    .node-setup-toggle,
-    .node-setup-content,
-    .node-setup-status {
-      padding: 16px;
+      padding: 0 0 15px;
     }
 
     .node-setup-toggle {
       align-items: flex-start;
       flex-direction: column;
       gap: 10px;
+      padding: 20px 0;
     }
 
     .node-wifi-form {
