@@ -1,4 +1,11 @@
 export type Exercise = 'squat' | 'deadlift';
+export type ExercisePhase = 'warmup' | 'training';
+
+export interface ExerciseSessionOptions {
+  exercise: Exercise;
+  phase: ExercisePhase;
+  targetReps: number;
+}
 
 export interface ExerciseFrame {
   timestamp: number;
@@ -18,12 +25,12 @@ export interface ExerciseFrame {
 export type ExerciseRep = Omit<ExerciseFrame, 'timestamp' | 'motion' | 'lockout'>;
 
 export type ExerciseEvent =
-  | { type: 'frame'; frame: ExerciseFrame }
-  | { type: 'rep'; rep: ExerciseRep }
-  | { type: 'complete' };
+  | { type: 'frame'; phase: ExercisePhase; frame: ExerciseFrame }
+  | { type: 'rep'; phase: ExercisePhase; rep: ExerciseRep }
+  | { type: 'complete'; phase: ExercisePhase };
 
 export interface ExerciseDataProvider {
   subscribe(listener: (event: ExerciseEvent) => void): () => void;
-  start(exercise: Exercise): void;
+  start(options: ExerciseSessionOptions): void;
   stop(): void;
 }
