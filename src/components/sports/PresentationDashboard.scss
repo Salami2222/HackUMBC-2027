@@ -74,6 +74,18 @@
   .presentation-menu-content > button:hover:not(:disabled) {
     background: #b99af817;
   }
+  .presentation-menu-content > .presentation-mascot-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .presentation-mascot-toggle > span:last-child {
+    color: #aaa2bc;
+    font-size: 11px;
+  }
+  .presentation-mascot-toggle[aria-checked='true'] > span:last-child {
+    color: #ceb3f9;
+  }
   .presentation-menu-content > button:disabled {
     opacity: 0.4;
     cursor: not-allowed;

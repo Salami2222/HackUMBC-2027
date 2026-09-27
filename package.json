@@ -33,6 +33,7 @@
     "test:measurements": "node --experimental-strip-types --test scripts/measurement.test.mjs scripts/angle-history.test.mjs",
     "test:service": "node --test scripts/tracking-service.test.mjs",
     "test:floor": "node --experimental-strip-types --test scripts/floor.test.mjs scripts/viewport.test.mjs",
+    "test:mascot": "node --experimental-strip-types --test scripts/mascot.test.mjs",
     "test:squat": "node --experimental-strip-types --test scripts/squat.test.mjs scripts/form-test.test.mjs",
     "lint": "tsc --noEmit && eslint --max-warnings=0 \"{electron,src}/**/*.{js,jsx,ts,tsx,json}\" && prettier --check \"{electron,src}/**/*.{js,jsx,ts,tsx,css,scss,md,json}\"",
     "lint:fix": "tsc --noEmit && eslint --fix --max-warnings=0 \"{electron,src}/**/*.{js,jsx,ts,tsx,json}\" && npm run format",

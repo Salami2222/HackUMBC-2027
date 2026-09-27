@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useAtomValue } from 'jotai';
+import { atom, useAtom, useAtomValue } from 'jotai';
 import { Link } from 'react-router-dom';
 import {
   DataFeedMessage,
@@ -30,6 +30,7 @@ import { nodeKey, nodePosition } from './node-positions';
 import './PresentationDashboard.scss';
 
 const PHASES = ['ready', 'descending', 'bottom', 'ascending'] as const;
+const mascotEnabledAtom = atom(false);
 export const PresentationPerformance = memo(function PresentationPerformance() {
   const session = useSquatSession();
   const {
@@ -280,6 +281,7 @@ export function PresentationDashboard({
   const [now, setNow] = useState(Date.now);
   const [viewMode, setViewMode] = useState<'Front' | 'Side' | '3D'>('3D');
   const [resetMessage, setResetMessage] = useState('');
+  const [mascotEnabled, setMascotEnabled] = useAtom(mascotEnabledAtom);
   const reset = useReset(
     { type: ResetType.Full },
     () =>
@@ -342,6 +344,15 @@ export function PresentationDashboard({
       >
         <summary aria-label="Session and calibration options">•••</summary>
         <div className="presentation-menu-content">
+          <button
+            role="switch"
+            aria-checked={mascotEnabled}
+            className="presentation-mascot-toggle"
+            onClick={() => setMascotEnabled((enabled) => !enabled)}
+          >
+            <span>School mascot</span>
+            <span aria-hidden="true">{mascotEnabled ? 'On' : 'Off'}</span>
+          </button>
           <SessionModeSelect id="presentation-session-type" />
           <button
             disabled={!session.canMeasure || active}
@@ -423,6 +434,7 @@ export function PresentationDashboard({
           {live ? (
             <SkeletonVisualizerWidget
               floorAnchored
+              appearance={mascotEnabled ? 'mascot' : 'skeleton'}
               onInit={(context) => {
                 view.current =
                   context.addView({

@@ -7,7 +7,9 @@ import {
   BasedSkeletonHelper,
 } from '@/utils/skeletonHelper';
 import {
+  AmbientLight,
   Bone,
+  DirectionalLight,
   GridHelper,
   Group,
   PerspectiveCamera,
@@ -30,6 +32,9 @@ import { Tween } from '@tweenjs/tween.js';
 import { EyeIcon } from '@/components/commons/icon/EyeIcon';
 import { floorOffset, standingHeight } from '@/measurement/floor';
 import { skeletonCameraFrame, SkeletonViewMode } from '@/measurement/viewport';
+import type { MascotRig } from '@/utils/mascotRig';
+
+export type SkeletonAppearance = 'skeleton' | 'mascot';
 
 const GROUND_COLOR = '#2c2c6b';
 
@@ -109,6 +114,29 @@ function initializePreview(
 
   scene.add(skeletonGroup);
   scene.add(skeleton[0]);
+
+  const ambient = new AmbientLight(0xffffff, 2);
+  const keyLight = new DirectionalLight(0xfff4e5, 3);
+  keyLight.position.set(-3, 5, -4);
+  const fillLight = new DirectionalLight(0xd8d2ff, 1.5);
+  fillLight.position.set(3, 3, 2);
+  scene.add(ambient, keyLight, fillLight);
+  let mascot: MascotRig | null = null;
+  let mascotLoading: Promise<MascotRig> | null = null;
+  let appearance: SkeletonAppearance = 'skeleton';
+  let destroyed = false;
+  let latestBones = new Map<BodyPart, BoneT>();
+
+  const updateAppearance = () => {
+    const showMascot =
+      appearance === 'mascot' &&
+      mascot?.update(latestBones, heightOffset || 1.7);
+    skeletonGroup.visible = !showMascot;
+    if (mascot) {
+      mascot.root.visible = !!showMascot;
+      mascot.root.quaternion.copy(skeletonGroup.quaternion);
+    }
+  };
 
   let heightOffset = 0;
   let skeletonOffset = 0;
@@ -208,7 +236,7 @@ function initializePreview(
   animationFrameId = requestAnimationFrame(animate);
 
   // Make sure orbit controls works only on the current view
-  canvas.addEventListener('pointermove', (event) => {
+  const onPointerMove = (event: PointerEvent) => {
     const x = event.offsetX / resolution.x;
     const y = 1 - event.offsetY / resolution.y;
     views.forEach((v) => {
@@ -223,9 +251,33 @@ function initializePreview(
         v.controls.enabled = false;
       }
     });
-  });
+  };
+  canvas.addEventListener('pointermove', onPointerMove);
 
   return {
+    setAppearance: async (next: SkeletonAppearance) => {
+      appearance = next;
+      updateAppearance();
+      if (next === 'skeleton' || mascot || destroyed) return;
+      if (!mascotLoading) {
+        mascotLoading = import('@/utils/loadMascot')
+          .then(({ loadMascot }) => loadMascot())
+          .then((loaded) => {
+            if (destroyed) loaded.dispose();
+            else {
+              mascot = loaded;
+              scene.add(loaded.root);
+              updateAppearance();
+            }
+            return loaded;
+          })
+          .catch((error) => {
+            mascotLoading = null;
+            throw error;
+          });
+      }
+      await mascotLoading;
+    },
     resize: (width: number, height: number) => {
       if (width <= 0 || height <= 0) return;
       resolution.set(width, height);
@@ -242,6 +294,7 @@ function initializePreview(
     },
     rebuildSkeleton,
     updatesBones: (bones: Map<BodyPart, BoneT>) => {
+      latestBones = bones;
       skeleton.forEach(
         (bone) => bone instanceof BoneKind && bone.updateData(bones)
       );
@@ -258,9 +311,21 @@ function initializePreview(
         skeletonOffset = newSkeletinOffset;
         skeletonGroup.position.set(0, skeletonOffset, 0);
       }
+      updateAppearance();
     },
     destroy: () => {
+      destroyed = true;
       cancelAnimationFrame(animationFrameId);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      views.forEach((view) => {
+        view.controls.dispose();
+        view.tween.stop();
+      });
+      mascot?.dispose();
+      grid.geometry.dispose();
+      (Array.isArray(grid.material) ? grid.material : [grid.material]).forEach(
+        (material) => material.dispose()
+      );
       skeletonHelper.dispose();
       if (!renderer) return;
       renderer.dispose();
@@ -334,12 +399,17 @@ function SkeletonVisualizer({
   onInit,
   disabled = false,
   floorAnchored = false,
+  appearance = 'skeleton',
 }: {
   onInit: (context: PreviewContext) => void;
   disabled?: boolean;
   floorAnchored?: boolean;
+  appearance?: SkeletonAppearance;
 }) {
   const { config } = useConfig();
+  const [modelStatus, setModelStatus] = useState<'loading' | 'ready' | 'error'>(
+    'ready'
+  );
 
   const previewContext = useRef<PreviewContext | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -350,6 +420,24 @@ function SkeletonVisualizer({
   const bones = useMemo(() => {
     return new Map(_bones.map((b) => [b.bodyPart, b]));
   }, [_bones]);
+
+  useEffect(() => {
+    const context = previewContext.current;
+    if (!context || disabled) return;
+    let cancelled = false;
+    setModelStatus(appearance === 'mascot' ? 'loading' : 'ready');
+    context.setAppearance(appearance).then(
+      () => {
+        if (!cancelled) setModelStatus('ready');
+      },
+      () => {
+        if (!cancelled) setModelStatus('error');
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [appearance, disabled, floorAnchored]);
 
   useEffect(() => {
     if (bones.size === 0) return;
@@ -420,6 +508,16 @@ function SkeletonVisualizer({
   return (
     <div ref={containerRef} className={classNames('w-full h-full')}>
       <canvas ref={canvasRef} className="w-full h-full" />
+      {appearance === 'mascot' && modelStatus !== 'ready' && (
+        <div
+          className="absolute top-4 left-4 rounded-lg bg-background-90 p-3 text-sm"
+          role="status"
+        >
+          {modelStatus === 'loading'
+            ? 'Loading mascot…'
+            : 'Mascot unavailable · showing skeleton. Switch off and on to retry.'}
+        </div>
+      )}
     </div>
   );
 }
@@ -442,11 +540,13 @@ export function SkeletonVisualizerWidget({
   disabled = false,
   toggleDisabled,
   floorAnchored = false,
+  appearance = 'skeleton',
 }: {
   onInit?: (context: PreviewContext) => void;
   disabled?: boolean;
   toggleDisabled?: () => void;
   floorAnchored?: boolean;
+  appearance?: SkeletonAppearance;
 }) {
   const { l10n } = useLocalization();
   const [error, setError] = useState(false);
@@ -463,6 +563,7 @@ export function SkeletonVisualizerWidget({
             onInit={onInit}
             disabled={disabled}
             floorAnchored={floorAnchored}
+            appearance={appearance}
           />
         </ErrorBoundary>
       </div>
