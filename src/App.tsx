@@ -1,5 +1,10 @@
 import { createContext, useEffect, useState } from 'react';
-import { HashRouter as Router, Navigate, useLocation } from 'react-router-dom';
+import {
+  HashRouter as Router,
+  NavLink,
+  Navigate,
+  useLocation,
+} from 'react-router-dom';
 import { AppContextProvider } from './components/providers/AppContext';
 import {
   useProvideWebsocketApi,
@@ -22,10 +27,31 @@ export const SLIMEVR_DISCORD = 'https://discord.gg/slimevr';
 
 function AppSurface() {
   const { pathname } = useLocation();
-  if (pathname === '/' || pathname === '/sports')
-    return <LiveMovementDashboard />;
-  if (pathname === '/demo') return <SportsDashboard />;
-  return <Navigate to="/" replace />;
+  if (!['/', '/calibration'].includes(pathname))
+    return <Navigate to="/" replace />;
+
+  return (
+    <div className="sports-app">
+      <header className="sports-header">
+        <div className="sports-brand">
+          <div className="brand-mark">M</div>
+          <strong>MotionLab</strong>
+        </div>
+        <nav className="sports-nav" aria-label="Main navigation">
+          <NavLink to="/" end>
+            Tracking
+          </NavLink>
+          <NavLink to="/calibration">Sensor Calibration</NavLink>
+        </nav>
+      </header>
+      <div hidden={pathname !== '/'}>
+        <SportsDashboard active={pathname === '/'} />
+      </div>
+      <div hidden={pathname !== '/calibration'}>
+        <LiveMovementDashboard active={pathname === '/calibration'} />
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
