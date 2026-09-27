@@ -34,6 +34,7 @@ export interface Reference {
   capturedAt: number;
 }
 export interface MeasurementState {
+  receivedAt: number;
   roles: RoleReading[];
   coreReady: boolean;
   oriented: boolean;
@@ -347,6 +348,7 @@ export class MeasurementEngine {
     const reference =
       this.reference?.signature === this.signature ? this.reference : null;
     return {
+      receivedAt: this.receivedAt,
       roles,
       coreReady: roles.every((role) => !role.reason),
       oriented: this.orientedSignature === this.signature,

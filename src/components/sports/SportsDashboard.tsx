@@ -17,6 +17,7 @@ import {
 import './SportsDashboard.scss';
 import { ImuAngleGraphs } from './ImuAngleGraphs';
 import { MeasurementPanel } from './MeasurementPanel';
+import { SquatSessionPanel } from './SquatSessionPanel';
 
 export function SportsDashboard({ active = true }: { active?: boolean }) {
   const { isConnected, useDataFeedPacket } = useWebsocketAPI();
@@ -66,6 +67,7 @@ export function SportsDashboard({ active = true }: { active?: boolean }) {
 
   return (
     <main className="sports-content tracking-screen" aria-label="Tracking">
+      <SquatSessionPanel />
       <section className="tracking-stage" aria-label="Live skeleton preview">
         <div className="sports-viewport">
           {active && live ? (

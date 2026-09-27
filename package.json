@@ -33,6 +33,7 @@
     "test:measurements": "node --experimental-strip-types --test scripts/measurement.test.mjs",
     "test:service": "node --test scripts/tracking-service.test.mjs",
     "test:floor": "node --experimental-strip-types --test scripts/floor.test.mjs",
+    "test:squat": "node --experimental-strip-types --test scripts/squat.test.mjs",
     "lint": "tsc --noEmit && eslint --max-warnings=0 \"{electron,src}/**/*.{js,jsx,ts,tsx,json}\" && prettier --check \"{electron,src}/**/*.{js,jsx,ts,tsx,css,scss,md,json}\"",
     "lint:fix": "tsc --noEmit && eslint --fix --max-warnings=0 \"{electron,src}/**/*.{js,jsx,ts,tsx,json}\" && npm run format",
     "format": "prettier --write \"{electron,src}/**/*.{js,jsx,ts,tsx,css,scss,md,json}\"",
