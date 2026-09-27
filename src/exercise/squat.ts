@@ -1,7 +1,31 @@
 export const WARMUP_REP_COUNT = 3;
-export const ACCEPTABLE_DEPTH_MIN_DEG = 75;
+export const ACCEPTABLE_DEPTH_MIN_DEG = 98;
 export const VERY_SHALLOW_THRESHOLD_DEG = 60;
-export const SQUAT_BASELINE_KEY = 'kinetiq/squat-baseline-v1';
+export const HEAD_INCLINATION_LIMIT_DEG = 35;
+export const SQUAT_BASELINE_KEY = 'kinetiq/squat-baseline-v2';
+
+export type HeadInclinationStatus =
+  | 'within-range'
+  | 'too-high'
+  | 'too-low'
+  | 'unavailable';
+
+export const HEAD_INCLINATION_LABELS: Record<HeadInclinationStatus, string> = {
+  'within-range': 'Head within range',
+  'too-high': 'Head tilted too far up',
+  'too-low': 'Head tilted too far down',
+  unavailable: 'Head angle unavailable',
+};
+
+// Uses calibrated head inclination relative to the floor, not head/chest pitch.
+export function classifyHeadInclination(
+  angle: number | null | undefined
+): HeadInclinationStatus {
+  if (angle == null || !Number.isFinite(angle)) return 'unavailable';
+  if (angle > HEAD_INCLINATION_LIMIT_DEG) return 'too-high';
+  if (angle < -HEAD_INCLINATION_LIMIT_DEG) return 'too-low';
+  return 'within-range';
+}
 
 export type SquatDepthClassification = 'acceptable' | 'shallow' | 'very-shallow';
 
@@ -20,7 +44,7 @@ export interface CompletedSquatRep extends SquatRepPeaks {
 }
 
 export interface SquatBaseline {
-  version: 1;
+  version: 2;
   sampleSize: typeof WARMUP_REP_COUNT;
   averageKneeFlexion: number;
   averageLeftKneeFlexion: number;
@@ -86,7 +110,7 @@ export function createSquatBaseline(
   const average = (get: (rep: CompletedSquatRep) => number) =>
     analysis.reps.reduce((total, rep) => total + get(rep), 0) / WARMUP_REP_COUNT;
   return {
-    version: 1,
+    version: 2,
     sampleSize: WARMUP_REP_COUNT,
     averageKneeFlexion: average((rep) => rep.achievedKneeFlexion),
     averageLeftKneeFlexion: average((rep) => rep.maxLeftKneeFlexion),
@@ -103,14 +127,19 @@ export function loadSquatBaseline(storage: BaselineStorage): SquatBaseline | nul
     if (!raw) return null;
     const value = JSON.parse(raw) as SquatBaseline;
     if (
-      value.version !== 1 ||
+      value.version !== 2 ||
       value.sampleSize !== WARMUP_REP_COUNT ||
       ![
         value.averageKneeFlexion,
         value.averageLeftKneeFlexion,
         value.averageRightKneeFlexion,
         value.createdAt,
-      ].every((item) => typeof item === 'number' && Number.isFinite(item))
+      ].every((item) => typeof item === 'number' && Number.isFinite(item)) ||
+      [
+        value.averageKneeFlexion,
+        value.averageLeftKneeFlexion,
+        value.averageRightKneeFlexion,
+      ].some((angle) => angle < ACCEPTABLE_DEPTH_MIN_DEG || angle > 180)
     )
       return null;
     return value;

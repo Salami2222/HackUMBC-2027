@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   analyzeWarmup,
   classifySquatDepth,
+  classifyHeadInclination,
   completeSquatRep,
   createSquatBaseline,
   loadSquatBaseline,
@@ -26,11 +27,11 @@ const reps = (angles) =>
   );
 
 for (const [angles, labels, accepted] of [
-  [[80, 85, 90], ['acceptable', 'acceptable', 'acceptable'], true],
-  [[80, 70, 85], ['acceptable', 'shallow', 'acceptable'], false],
-  [[90, 55, 87], ['acceptable', 'very-shallow', 'acceptable'], false],
-  [[65, 68, 82], ['shallow', 'shallow', 'acceptable'], false],
-  [[110, 120, 95], ['acceptable', 'acceptable', 'acceptable'], true],
+  [[98, 100, 105], ['acceptable', 'acceptable', 'acceptable'], true],
+  [[100, 90, 102], ['acceptable', 'shallow', 'acceptable'], false],
+  [[99, 55, 101], ['acceptable', 'very-shallow', 'acceptable'], false],
+  [[65, 90, 100], ['shallow', 'shallow', 'acceptable'], false],
+  [[110, 120, 98], ['acceptable', 'acceptable', 'acceptable'], true],
 ]) {
   test(`three-rep depth result for ${angles.join(', ')}`, () => {
     const result = analyzeWarmup(reps(angles));
@@ -59,7 +60,9 @@ test('the straighter leg determines depth; no upper depth cutoff exists', () => 
   assert.equal(rep.achievedKneeFlexion, 68);
   assert.equal(rep.depthClassification, 'shallow');
   assert.equal(classifySquatDepth(120), 'acceptable');
-  assert.equal(classifySquatDepth(75), 'acceptable');
+  assert.equal(classifySquatDepth(98), 'acceptable');
+  assert.equal(classifySquatDepth(97.9), 'shallow');
+  assert.equal(classifySquatDepth(75), 'shallow');
   assert.equal(classifySquatDepth(60), 'shallow');
   assert.equal(classifySquatDepth(59.9), 'very-shallow');
 });
@@ -67,7 +70,7 @@ test('the straighter leg determines depth; no upper depth cutoff exists', () => 
 test('analysis waits for all three reps even when the first fails', () => {
   assert.throws(() => analyzeWarmup(reps([55])));
   assert.throws(() => analyzeWarmup(reps([55, 85])));
-  const result = analyzeWarmup(reps([55, 85, 90]));
+  const result = analyzeWarmup(reps([55, 100, 105]));
   assert.equal(result.reps.length, WARMUP_REP_COUNT);
   assert.equal(result.failedDepthRepCount, 1);
   assert.equal(result.accepted, false);
@@ -106,7 +109,7 @@ test('a bad first rep does not stop detection of the second and third', () => {
   const detector = new SquatRepDetector();
   const recorded = [];
   let at = 1000;
-  for (const angle of [55, 85, 90]) {
+  for (const angle of [55, 100, 105]) {
     const fed = feedRep(detector, angle, angle, at);
     recorded.push(...fed.results);
     at = fed.nextAt;
@@ -131,7 +134,7 @@ test('retry resets incomplete movement and allows a fresh three-rep attempt', ()
   detector.reset();
   const recorded = [];
   let at = 5000;
-  for (const angle of [80, 85, 90]) {
+  for (const angle of [98, 100, 105]) {
     const fed = feedRep(detector, angle, angle, at);
     recorded.push(...fed.results);
     at = fed.nextAt;
@@ -151,11 +154,14 @@ test('an accepted baseline persists; failed replacement does not overwrite it', 
     getItem: (key) => values.get(key) ?? null,
     setItem: (key, value) => values.set(key, value),
   };
-  const accepted = createSquatBaseline(analyzeWarmup(reps([80, 85, 90])), 2000);
+  const accepted = createSquatBaseline(
+    analyzeWarmup(reps([98, 100, 105])),
+    2000
+  );
   saveSquatBaseline(storage, accepted);
   assert.deepEqual(loadSquatBaseline(storage), accepted);
   const previous = values.get(SQUAT_BASELINE_KEY);
-  const rejected = analyzeWarmup(reps([80, 70, 85]));
+  const rejected = analyzeWarmup(reps([100, 90, 102]));
   assert.throws(() => createSquatBaseline(rejected, 3000));
   assert.equal(values.get(SQUAT_BASELINE_KEY), previous);
   assert.equal(loadSquatBaseline(storage)?.sampleSize, 3);
@@ -215,4 +221,31 @@ test('a data gap discards a partial rep and requires upright before rearming', (
   );
   assert.equal(resumed.results.length, 0);
   assert.equal(feedRep(detector, 85, 85, resumed.nextAt).results.length, 1);
+});
+
+test('head inclination accepts both 35-degree boundaries and flags either direction', () => {
+  for (const angle of [-35, -10, 0, 10, 35]) {
+    assert.equal(classifyHeadInclination(angle), 'within-range');
+  }
+  assert.equal(classifyHeadInclination(35.01), 'too-high');
+  assert.equal(classifyHeadInclination(-35.01), 'too-low');
+  for (const angle of [null, undefined, NaN, Infinity, -Infinity]) {
+    assert.equal(classifyHeadInclination(angle), 'unavailable');
+  }
+});
+
+test('old depth baselines and out-of-range saved values cannot start a new session', () => {
+  const baseline = createSquatBaseline(
+    analyzeWarmup(reps([98, 100, 105])),
+    2000
+  );
+  const storage = (value) => ({ getItem: () => JSON.stringify(value) });
+  assert.deepEqual(loadSquatBaseline(storage(baseline)), baseline);
+  assert.equal(loadSquatBaseline(storage({ ...baseline, version: 1 })), null);
+  for (const angle of [75, 97.9, 181]) {
+    assert.equal(
+      loadSquatBaseline(storage({ ...baseline, averageKneeFlexion: angle })),
+      null
+    );
+  }
 });

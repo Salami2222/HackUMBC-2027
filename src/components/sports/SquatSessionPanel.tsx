@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMeasurements } from '@/measurement/MeasurementProvider';
 import {
+  ACCEPTABLE_DEPTH_MIN_DEG,
+  HEAD_INCLINATION_LIMIT_DEG,
+  HEAD_INCLINATION_LABELS,
+  classifyHeadInclination,
   analyzeWarmup,
   completeSquatRep,
   CompletedSquatRep,
@@ -54,6 +58,12 @@ export function SquatSessionPanel() {
     Number.isFinite(left) &&
     typeof right === 'number' &&
     Number.isFinite(right);
+  const head = measurementState.measurements.find(
+    (measurement) => measurement.id === 'headInclination'
+  )?.value;
+  const headStatus = classifyHeadInclination(
+    measurementState.referenceReady ? head : null
+  );
 
   useEffect(() => {
     if (measurementState.referenceReady) return;
@@ -204,7 +214,7 @@ export function SquatSessionPanel() {
           <p>
             {result.accepted
               ? 'Baseline accepted.'
-              : `${result.failedDepthRepCount} of ${WARMUP_REP_COUNT} reps did not reach the required squat depth. Retry and aim for at least 75° of knee flexion.`}
+              : `${result.failedDepthRepCount} of ${WARMUP_REP_COUNT} reps did not reach the required squat depth. Retry and aim for at least ${ACCEPTABLE_DEPTH_MIN_DEG}° of knee flexion.`}
           </p>
           {!result.accepted && baseline && (
             <p>Your previous accepted baseline is still available.</p>
@@ -292,6 +302,16 @@ export function SquatSessionPanel() {
           {notice}
         </p>
       )}
+      <p className="squat-notice">
+        Depth target: {ACCEPTABLE_DEPTH_MIN_DEG}° knee bend · Head range: ±
+        {HEAD_INCLINATION_LIMIT_DEG}° from upright
+      </p>
+      <p className="squat-notice" data-head-status={headStatus}>
+        {HEAD_INCLINATION_LABELS[headStatus]}
+        {headStatus !== 'unavailable' && head != null
+          ? ` · ${head.toFixed(1)}°`
+          : ''}
+      </p>
       {(phase === 'warmup' || phase === 'training') && canMeasure && (
         <p className="squat-notice">
           Start upright, then squat and return upright to count each rep.

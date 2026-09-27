@@ -2,6 +2,12 @@ import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useMeasurements } from '@/measurement/MeasurementProvider';
 import {
+  ACCEPTABLE_DEPTH_MIN_DEG,
+  HEAD_INCLINATION_LIMIT_DEG,
+  HEAD_INCLINATION_LABELS,
+  classifyHeadInclination,
+} from '@/exercise/squat';
+import {
   DebugSample,
   TraceKey,
   WINDOW_MS,
@@ -15,6 +21,7 @@ const graphs = [
     min: -120,
     max: 120,
     ticks: [120, 60, 0, -60, -120],
+    thresholds: [-HEAD_INCLINATION_LIMIT_DEG, HEAD_INCLINATION_LIMIT_DEG],
     note: 'Positive = up · negative = down · zero = upright reference. Solid: head relative to the floor. Dashed: head relative to chest.',
     traces: [
       { key: 'headInclination', label: 'Head', color: '#b79aff' },
@@ -26,6 +33,7 @@ const graphs = [
     min: 0,
     max: 180,
     ticks: [180, 90, 0],
+    thresholds: [ACCEPTABLE_DEPTH_MIN_DEG],
     note: 'Knee bend: 0° = straight reference. Inner-angle estimate = 180° − bend. Left and right refer to your body.',
     traces: [
       { key: 'leftKnee', label: 'Left', color: '#b79aff' },
@@ -37,6 +45,7 @@ const graphs = [
   min: number;
   max: number;
   ticks: number[];
+  thresholds: number[];
   note: string;
   traces: { key: TraceKey; label: string; color: string }[];
 }[];
@@ -150,6 +159,25 @@ export function MovementDebugGraphs() {
                   strokeDasharray={index ? '5 3' : undefined}
                 />
               ))}
+              {graph.thresholds.map((value) => {
+                const y =
+                  16 + ((graph.max - value) / (graph.max - graph.min)) * 120;
+                return (
+                  <g key={value}>
+                    <line
+                      x1="40"
+                      x2="388"
+                      y1={y}
+                      y2={y}
+                      style={{ stroke: '#eebd77' }}
+                      strokeDasharray="3 4"
+                    />
+                    <text x="388" y={y - 4} textAnchor="end">
+                      {value}° target
+                    </text>
+                  </g>
+                );
+              })}
               <text x="40" y="156">
                 −10s
               </text>
@@ -158,6 +186,20 @@ export function MovementDebugGraphs() {
               </text>
             </svg>
             <p className="imu-graph-note">{graph.note}</p>
+            {graph.traces[0].key === 'headInclination' && (
+              <p className="imu-graph-note">
+                {
+                  HEAD_INCLINATION_LABELS[
+                    classifyHeadInclination(
+                      state.referenceReady
+                        ? reading('headInclination')?.value
+                        : null
+                    )
+                  ]
+                }{' '}
+                · target range ±{HEAD_INCLINATION_LIMIT_DEG}°
+              </p>
+            )}
             <dl className="debug-stats">
               {graph.traces.map((trace) => {
                 const stat = traceStats(samples, trace.key, now);
@@ -186,8 +228,8 @@ export function MovementDebugGraphs() {
         ))}
       </div>
       <p className="imu-graph-note">
-        Orientation estimates, not eye gaze or a form verdict. No good/bad
-        thresholds are applied. Gaps mean unavailable data.
+        Angle targets use your team's testing thresholds, not an overall form
+        verdict or eye-gaze measurement. Gaps mean unavailable data.
       </p>
     </section>
   );
