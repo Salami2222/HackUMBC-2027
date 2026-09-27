@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAtomValue } from 'jotai';
-import { Link } from 'react-router-dom';
 import {
   AssignTrackerRequestT,
   BodyPart,
@@ -20,9 +19,9 @@ import {
   SkeletonPreviewView,
   SkeletonVisualizerWidget,
 } from '@/components/widgets/SkeletonVisualizerWidget';
-import './SportsDashboard.scss';
 import { NodeSetup } from './NodeSetup';
 import { NodePicker } from './NodePicker';
+import './SportsDashboard.scss';
 
 function trackerKey(tracker: TrackerDataT) {
   return `${tracker.trackerId?.deviceId?.id}:${tracker.trackerId?.trackerNum}`;
@@ -34,7 +33,7 @@ function trackerName(tracker: TrackerDataT) {
   );
 }
 
-export function LiveMovementDashboard() {
+export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
   const { isConnected, sendRPCPacket, useDataFeedPacket } = useWebsocketAPI();
   const trackers = useAtomValue(flatTrackersAtom).filter(
     ({ tracker }) => tracker.info?.isImu && !tracker.info.isComputed
@@ -144,78 +143,57 @@ export function LiveMovementDashboard() {
   };
 
   return (
-    <div className="sports-app live-dashboard">
-      <header className="sports-header">
-        <div className="sports-brand">
-          <div className="brand-mark">M</div>
-          <div>
-            <strong>MotionLab</strong>
-            <small>Movement studio</small>
-          </div>
+    <main className="sports-content calibration-screen">
+      <div className="tracking-intro">
+        <div>
+          <span className="eyebrow">SlimeVR hardware</span>
+          <h1>Sensor Calibration</h1>
         </div>
-        <div className="sports-header-center">Live tracking</div>
-        <div className="sports-header-right">
-          <span className={live ? 'live-dot' : ''} />
-          <span>{live ? 'Tracking live' : 'Awaiting connection'}</span>
-          <Link to="/demo">Open demo</Link>
-        </div>
-      </header>
-      <main className="sports-content">
-        <div className="sports-heading">
-          <div>
-            <div className="eyebrow">Hardware overview</div>
-            <h1>Live movement</h1>
-            <p>Connect a node to see your chest orientation in real time.</p>
-          </div>
-        </div>
+        <span className="source-note">
+          <i className={live ? 'is-running' : ''} />{' '}
+          {live ? 'Sensor live' : 'Awaiting sensor'}
+        </span>
+      </div>
+
+      <div className="calibration-layout">
         <section
-          className="sports-panel control-panel"
-          aria-label="Session controls"
+          className="calibration-controls"
+          aria-label="Calibrate a sensor"
         >
-          <div className="control-panel-intro">
-            <div>
-              <span className="panel-index">SETUP</span>
-              <h2>Session controls</h2>
-            </div>
-            <p>
-              Choose a node, assign it to your chest, then reset your upright
-              pose.
-            </p>
+          <p className="calibration-lead">
+            Connect a node, assign it to your chest, then reset your upright
+            pose.
+          </p>
+          <div className="calibration-status" role="status">
+            <i className={live ? 'is-running' : ''} />
+            <span>{status}</span>
           </div>
-          <div className="sports-controls">
-            <NodePicker
-              label="Chest node"
-              value={selected ? trackerKey(selected) : ''}
-              placeholder={
-                trackers.length ? 'Choose a node' : 'No nodes added yet'
-              }
-              onChange={(value) => {
-                setSelectedKey(value);
-                setAssignment(null);
-                setCalibrationMessage('');
-              }}
-              options={trackers.map(({ tracker }) => ({
-                value: trackerKey(tracker),
-                label: trackerName(tracker).replace(/^Tracker\s+/, 'Node '),
-                detail: !fresh
-                  ? 'Offline'
-                  : tracker.status === TrackerStatus.OK
-                    ? 'Online'
-                    : tracker.status === TrackerStatus.BUSY
-                      ? 'Starting'
-                      : tracker.status === TrackerStatus.ERROR
-                        ? 'Needs attention'
-                        : 'Offline',
-              }))}
-            />
-            <button
-              className="secondary-button"
-              onClick={() => setSetupOpen(!setupOpen)}
-              aria-expanded={setupOpen}
-              aria-controls="node-setup-content"
-            >
-              Connect nodes
-            </button>
+          <NodePicker
+            label="Chest node"
+            value={selected ? trackerKey(selected) : ''}
+            placeholder={
+              trackers.length ? 'Choose a node' : 'No nodes added yet'
+            }
+            onChange={(value) => {
+              setSelectedKey(value);
+              setAssignment(null);
+              setCalibrationMessage('');
+            }}
+            options={trackers.map(({ tracker }) => ({
+              value: trackerKey(tracker),
+              label: trackerName(tracker).replace(/^Tracker\s+/, 'Node '),
+              detail: !fresh
+                ? 'Offline'
+                : tracker.status === TrackerStatus.OK
+                  ? 'Online'
+                  : tracker.status === TrackerStatus.BUSY
+                    ? 'Starting'
+                    : tracker.status === TrackerStatus.ERROR
+                      ? 'Needs attention'
+                      : 'Offline',
+            }))}
+          />
+          <div className="calibration-actions">
             <button
               className="primary-button"
               onClick={assignChest}
@@ -248,139 +226,95 @@ export function LiveMovementDashboard() {
                 : 'Reset upright pose'}
             </button>
           </div>
-        </section>
-        <NodeSetup open={setupOpen} onToggle={() => setSetupOpen(!setupOpen)} />
-        <div className="live-connection-note" role="status">
-          <strong>{status}.</strong>{' '}
-          {live
-            ? 'Chest is measured; the rest of the skeleton is estimated.'
-            : 'Turn on your node and connect to the same Wi-Fi as this computer. Use Connect nodes for first-time setup.'}
           {assignment && !assignedConfirmation && !assignmentPending && (
-            <p>Assignment was not confirmed. Check the connection and retry.</p>
+            <p className="calibration-feedback">
+              Assignment was not confirmed. Check the connection and retry.
+            </p>
           )}
-          {calibrationMessage && <p>{calibrationMessage}</p>}
-        </div>
-        <section className="sports-hero">
-          <div className="sports-panel viewport-panel">
-            <div className="panel-top">
-              <div>
-                <span className="panel-index">MOVEMENT</span>
-                <h2>Skeleton view</h2>
-              </div>
-            </div>
-            <div className="sports-viewport">
-              {skeletonLive ? (
-                <SkeletonVisualizerWidget
-                  onInit={(context) => {
-                    view.current =
-                      context.addView({
-                        left: 0,
-                        bottom: 0,
-                        width: 1,
-                        height: 1,
-                        position: new Vector3(2.5, 1.9, -2.8),
-                        onHeightChange(v, height) {
-                          v.controls.target.set(0, height / 2.2, 0);
-                          v.camera.zoom = 1 / (Math.max(1, height) / 1.55);
-                          v.camera.updateProjectionMatrix();
-                        },
-                      }) ?? null;
-                  }}
-                />
-              ) : (
-                <div className="live-empty-state">
-                  <h3>{status}</h3>
-                  <p>No simulated movement is shown in live mode.</p>
-                </div>
-              )}
-              <div className="viewport-status">
-                {skeletonLive
-                  ? 'LIVE CHEST / ESTIMATED SKELETON'
-                  : 'NO LIVE POSE'}
-              </div>
-            </div>
-            <div className="viewport-footer">
-              <div>{fresh ? available.length : 0} NODES ONLINE</div>
-              <div className="view-buttons">
-                <button
-                  disabled={!skeletonLive}
-                  onClick={() => setView(new Vector3(0, 1.3, -4))}
-                >
-                  FRONT
-                </button>
-                <button
-                  disabled={!skeletonLive}
-                  onClick={() => setView(new Vector3(4, 1.3, 0))}
-                >
-                  SIDE
-                </button>
-                <button
-                  disabled={!skeletonLive}
-                  onClick={() => setView(new Vector3(2.5, 1.9, -2.8))}
-                >
-                  3D
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="sports-panel metrics-panel">
-            <div className="panel-top">
-              <div>
-                <span className="panel-index">MEASUREMENTS</span>
-                <h2>Chest orientation</h2>
-              </div>
-              <span className="panel-tag">
-                {live ? 'STREAMING' : 'WAITING'}
+          {calibrationMessage && (
+            <p className="calibration-feedback" role="status">
+              {calibrationMessage}
+            </p>
+          )}
+          <div className="sensor-readout">
+            <span>{fresh ? available.length : 0} nodes online</span>
+            {angles && (
+              <span data-testid="chest-orientation">
+                Chest · pitch {angles.x.toFixed(1)}° · yaw {angles.y.toFixed(1)}
+                ° · roll {angles.z.toFixed(1)}°
               </span>
-            </div>
-            <div className="metrics-grid">
-              {(['x', 'y', 'z'] as const).map((axis, index) => (
-                <div className="sports-metric" key={axis}>
-                  <span className="metric-label">
-                    {['PITCH', 'YAW', 'ROLL'][index]}
-                  </span>
-                  <div className="metric-value" data-testid={`chest-${axis}`}>
-                    {angles ? angles[axis].toFixed(1) : '—'}
-                    <span>°</span>
-                  </div>
-                  <span className="metric-note">
-                    {selected?.rotationReferenceAdjusted
-                      ? 'Aligned orientation'
-                      : 'Node orientation'}
-                  </span>
-                </div>
-              ))}
-              {['KNEE ANGLES', 'REP COUNT', 'FORM SCORE'].map((label) => (
-                <div className="sports-metric" key={label}>
-                  <span className="metric-label">{label}</span>
-                  <div className="metric-value">—</div>
-                  <span className="metric-note">
-                    Unavailable with this setup
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div className="live-measurement-note">
-              <h3>One tracker, chest orientation</h3>
-              <p>
-                Attach the tracker securely to your chest, stand upright, then
-                reset the upright pose. These angles describe orientation, not a
-                validated lifting score.
-              </p>
-              <p>
-                Other body segments are inferred. A single chest IMU cannot
-                measure your knees, squat depth, or full-body form.
-              </p>
+            )}
+          </div>
+          <p className="calibration-footnote">
+            One chest IMU measures orientation. Full squat angles and rep counts
+            still use the simulated Tracking stream.
+          </p>
+        </section>
+
+        <section className="sensor-preview" aria-label="Live skeleton preview">
+          <div className="stage-title">
+            <span>Live skeleton preview</span>
+            <span>{skeletonLive ? 'LIVE' : 'NO LIVE POSE'}</span>
+          </div>
+          <div className="sports-viewport">
+            {active && skeletonLive ? (
+              <SkeletonVisualizerWidget
+                onInit={(context) => {
+                  view.current =
+                    context.addView({
+                      left: 0,
+                      bottom: 0,
+                      width: 1,
+                      height: 1,
+                      position: new Vector3(2.5, 1.9, -2.8),
+                      onHeightChange(v, height) {
+                        v.controls.target.set(0, height / 2.2, 0);
+                        v.camera.zoom = 1 / (Math.max(1, height) / 1.55);
+                        v.camera.updateProjectionMatrix();
+                      },
+                    }) ?? null;
+                }}
+              />
+            ) : (
+              <div className="live-empty-state">
+                <strong>{status}</strong>
+                <span>
+                  Connect and calibrate a node to preview the live pose.
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="stage-footer">
+            <span>
+              {skeletonLive
+                ? 'Chest measured · remaining segments estimated'
+                : 'SlimeVR pose preview'}
+            </span>
+            <div className="view-buttons" aria-label="Skeleton view">
+              <button
+                disabled={!skeletonLive}
+                onClick={() => setView(new Vector3(0, 1.3, -4))}
+              >
+                Front
+              </button>
+              <button
+                disabled={!skeletonLive}
+                onClick={() => setView(new Vector3(4, 1.3, 0))}
+              >
+                Side
+              </button>
+              <button
+                disabled={!skeletonLive}
+                onClick={() => setView(new Vector3(2.5, 1.9, -2.8))}
+              >
+                3D
+              </button>
             </div>
           </div>
         </section>
-        <footer className="sports-footer">
-          MOTIONLAB / LIVE HARDWARE
-          <span>
-            {isConnected ? 'Ready for your nodes' : 'Local service offline'}
-          </span>
-        </footer>
-      </main>
-    </div>
+      </div>
+
+      <NodeSetup open={setupOpen} onToggle={() => setSetupOpen(!setupOpen)} />
+    </main>
   );
 }
