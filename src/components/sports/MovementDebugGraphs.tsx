@@ -2,6 +2,10 @@ import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useMeasurements } from '@/measurement/MeasurementProvider';
 import {
+  KNEE_INWARD_START_DEG,
+  KNEE_INWARD_FULL_DEG,
+} from '@/exercise/form-quality';
+import {
   ACCEPTABLE_DEPTH_MIN_DEG,
   HEAD_INCLINATION_LIMIT_DEG,
   HEAD_INCLINATION_LABELS,
@@ -38,6 +42,18 @@ const graphs = [
     traces: [
       { key: 'leftKnee', label: 'Left', color: '#b79aff' },
       { key: 'rightKnee', label: 'Right', color: '#75d6d0' },
+    ],
+  },
+  {
+    title: 'Knee inward deviation · experimental',
+    min: -45,
+    max: 45,
+    ticks: [45, 20, 0, -20, -45],
+    thresholds: [KNEE_INWARD_START_DEG, KNEE_INWARD_FULL_DEG],
+    note: 'Positive = inward · negative = outward from your upright reference. Experimental 8–20° penalty range while bent. Verify tracker alignment before interpreting this estimate.',
+    traces: [
+      { key: 'leftKneeInward', label: 'Left', color: '#b79aff' },
+      { key: 'rightKneeInward', label: 'Right', color: '#75d6d0' },
     ],
   },
 ] satisfies {
@@ -173,7 +189,10 @@ export function MovementDebugGraphs() {
                       strokeDasharray="3 4"
                     />
                     <text x="388" y={y - 4} textAnchor="end">
-                      {value}° target
+                      {value}°{' '}
+                      {graph.traces[0].key === 'leftKneeInward'
+                        ? 'limit'
+                        : 'target'}
                     </text>
                   </g>
                 );

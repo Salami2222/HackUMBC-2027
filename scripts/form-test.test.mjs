@@ -16,6 +16,8 @@ function assessment(rep = 1, change = () => ({}), depth = 100) {
       phase: i === 80 ? 'ready' : i < 40 ? 'descending' : 'ascending',
       values: {
         leftKnee: bend,
+        leftKneeInward: 0,
+        rightKneeInward: 0,
         rightKnee: bend,
         chestTilt: 20,
         chestRoll: 0,
@@ -69,6 +71,11 @@ test('Form Test stores the shared weighted assessment unchanged, including Jev',
 });
 for (const [name, change, rating] of [
   ['head', () => ({ headInclination: 65 }), 'suboptimal'],
+  [
+    'inward knees',
+    () => ({ leftKneeInward: 22, rightKneeInward: 22 }),
+    'attention',
+  ],
   ['torso', () => ({ chestRoll: 35 }), 'suboptimal'],
   ['symmetry', (_, bend) => ({ leftKnee: bend + 40 }), 'suboptimal'],
   [

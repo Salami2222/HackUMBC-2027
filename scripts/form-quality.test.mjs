@@ -15,6 +15,8 @@ function frames(change = () => ({})) {
       phase: i === 80 ? 'ready' : i < 40 ? 'descending' : 'ascending',
       values: {
         leftKnee: bend,
+        leftKneeInward: 0,
+        rightKneeInward: 0,
         rightKnee: bend,
         chestTilt: 20,
         chestRoll: 0,
@@ -44,7 +46,7 @@ test('brief head or foot spikes do not become sustained issues', () => {
   );
   assert.equal(r.rating, 'optimal');
 });
-test('each single family is capped and cannot trigger needs attention', () => {
+test('single non-collapse families remain capped and cannot trigger needs attention', () => {
   for (const change of [
     () => ({ headInclination: 80 }),
     () => ({ chestRoll: 35 }),
@@ -118,7 +120,7 @@ test('weighted scores remain numeric contributions, independent of rating gates'
   assert.equal(head.score, 95);
   assert.equal(head.rating, 'suboptimal');
   const torso = assess(() => ({ chestRoll: 35 }));
-  assert.equal(torso.score, 70);
+  assert.equal(torso.score, 80);
 });
 
 test('persistent modest deviations deduct points without moving the configured head or depth targets', () => {
@@ -142,6 +144,8 @@ test('chest drop is measured consistently at 10 through 100 Hz', () => {
         values: {
           ...frames()[0].values,
           leftKnee: bend,
+          leftKneeInward: 0,
+          rightKneeInward: 0,
           rightKnee: bend,
           chestTilt: t < 0.6 ? 0 : (t - 0.6) * 60,
         },
@@ -158,13 +162,14 @@ test('chest drop is measured consistently at 10 through 100 Hz', () => {
   );
 });
 
-test('four active weights total 100 and foot values cannot affect coverage or score', () => {
+test('five active weights total 100 and foot values cannot affect coverage or score', () => {
   assert.deepEqual(
     GROUPS.map((g) => [g.id, g.weight]),
     [
-      ['symmetry', 35],
-      ['torso', 30],
-      ['depth', 30],
+      ['collapse', 40],
+      ['symmetry', 20],
+      ['torso', 20],
+      ['depth', 15],
       ['head', 5],
     ]
   );
@@ -189,4 +194,74 @@ test('rapid lowering alone no longer deducts points', () => {
     rightKnee: i < 10 ? i * 20 : 100,
   }));
   assert.equal(evaluateFormRep(samples, 1, 100, 9100).score, 100);
+});
+
+test('pronounced sustained inward deviation on either or both knees has a single 40 point cap', () => {
+  for (const change of [
+    () => ({ leftKneeInward: 22 }),
+    () => ({ rightKneeInward: 22 }),
+    () => ({ leftKneeInward: 22, rightKneeInward: 22 }),
+  ]) {
+    const r = assess(change);
+    assert.equal(r.score, 60);
+    assert.equal(r.rating, 'attention');
+    assert.equal(r.groups.find((g) => g.id === 'symmetry').severity, 0);
+    assert.match(r.reason, /600 ms/);
+  }
+});
+
+test('experimental inward thresholds distinguish neutral, moderate, pronounced and outward movement', () => {
+  for (const angle of [-25, 0, 8])
+    assert.equal(assess(() => ({ leftKneeInward: angle })).score, 100);
+  const moderate = assess(() => ({ leftKneeInward: 12 }));
+  assert.equal(moderate.rating, 'suboptimal');
+  assert.ok(moderate.score > 65 && moderate.score < 85);
+  assert.equal(assess(() => ({ leftKneeInward: 18 })).rating, 'attention');
+  assert.equal(assess(() => ({ leftKneeInward: 20 })).score, 60);
+});
+
+test('inward score ignores upright stance and needs persistence on the same side', () => {
+  assert.equal(
+    assess(() => ({ leftKnee: 10, rightKnee: 10, leftKneeInward: 25 })).score,
+    100
+  );
+  assert.equal(
+    assess((i) => ({ leftKneeInward: i === 30 || i === 31 ? 25 : 0 })).score,
+    100
+  );
+  // Four packets give a qualifying 400ms deduction, but not the 600ms single-factor exception.
+  const short = assess((i) => ({ leftKneeInward: i >= 30 && i < 34 ? 25 : 0 }));
+  assert.equal(short.score, 60);
+  assert.equal(short.rating, 'suboptimal');
+  const alternating = assess((i) => ({
+    leftKneeInward: i % 6 < 3 ? 25 : 0,
+    rightKneeInward: i % 6 >= 3 ? 25 : 0,
+  }));
+  assert.equal(alternating.score, 100);
+});
+
+test('missing inward measurement remains unknown and cannot be replaced by the other knee', () => {
+  for (const invalid of [null, undefined, NaN, Infinity]) {
+    const r = assess(() => ({ leftKneeInward: invalid, rightKneeInward: 25 }));
+    assert.equal(r.score, null);
+    assert.equal(r.rating, 'unknown');
+  }
+});
+
+test('inward persistence and scoring are stable from 10 to 100 Hz', () => {
+  for (const hz of [10, 20, 30, 60, 100]) {
+    const samples = Array.from({ length: hz * 3 + 1 }, (_, i) => ({
+      at: 1000 + (i * 1000) / hz,
+      phase: i < hz ? 'descending' : 'ascending',
+      values: {
+        ...frames()[0].values,
+        leftKnee: 90,
+        rightKnee: 90,
+        leftKneeInward: i / hz >= 1 && i / hz <= 2 ? 22 : 0,
+      },
+    }));
+    const r = evaluateFormRep(samples, 1, 100, 4000);
+    assert.equal(r.score, 60, `${hz}Hz`);
+    assert.equal(r.rating, 'attention', `${hz}Hz`);
+  }
 });

@@ -35,6 +35,8 @@ function frames(change = () => ({}), step = 100, end = 3700) {
               : 'ready',
       values: {
         leftKnee: bend,
+        leftKneeInward: 0,
+        rightKneeInward: 0,
         rightKnee: bend,
         chestTilt: 30,
         chestRoll: 0,
@@ -82,20 +84,56 @@ const assessment = () =>
     14000
   );
 
-test('form review contains only bounded scalar summaries and four factor records', () => {
+test('form review contains only bounded scalar summaries and five factor records', () => {
   const b = fixture();
   assert.equal(validFormReview(b), true);
   assert.deepEqual(Object.keys(b.metrics).sort(), [...metricKeys].sort());
   assert.equal(b.metrics.bilateralPeakDeg, 100);
   assert.equal(b.metrics.headOutside35Ms, 0);
   assert.equal(b.metrics.currentLeftKneeDeg, 15);
-  assert.ok(JSON.stringify(b).length < 2500);
+  assert.ok(JSON.stringify(b).length < 3000);
   const payload = formRequest(b);
   assert.equal(payload.state.samples, undefined);
   assert.equal(payload.state.metrics.bilateralPeakDeg, 100);
   assert.equal(payload.questions.depth, undefined);
+  assert.equal(payload.questions.collapse, undefined);
+  assert.equal(b.metrics.leftKneeInwardPeakDeg, 0);
+  assert.equal(b.groups.length, 5);
+  assert.equal(metricKeys.length, 28);
   assert.equal(Object.keys(payload.questions).length, 3);
   assert.equal(payload.state.headInclinationLimitDeg, 35);
+});
+
+test('Jev receives curated inward evidence but cannot override its measured deduction or rating', () => {
+  const samples = frames(
+    () => ({ leftKneeInward: 22, rightKneeInward: 22 }),
+    100,
+    4000
+  );
+  const measured = evaluateFormRep(samples, 1, 100, 14000);
+  const body = summarizeFormReview(samples.slice(0, -1), measured);
+  const advice = parseFormAdvice(response('none'), body);
+  // Even an unexpected model claim about collapse must not change that factor.
+  advice.factors.collapse = {
+    severity: 0,
+    confidence: 1,
+    probability: 1,
+    uncertain: false,
+  };
+  const scored = blendFormAdvice(measured, advice);
+  assert.equal(body.metrics.leftKneeInwardPeakDeg, 22);
+  assert.ok(body.metrics.leftKneeInwardAtLeast18Ms >= 600);
+  assert.equal(validFormReview(body), true);
+  assert.equal(scored.score, 60);
+  assert.equal(scored.rating, 'attention');
+  const missing = frames(() => ({ leftKneeInward: null }));
+  const unknown = summarizeFormReview(
+    missing,
+    evaluateFormRep(missing, 1, 100, 13700)
+  );
+  assert.equal(unknown.metrics.leftKneeInwardPeakDeg, null);
+  assert.equal(unknown.metrics.leftKneeInwardOver8Ms, null);
+  assert.equal(validFormReview(unknown), false);
 });
 
 test('summary uses actual timestamps, retains missing data and does not interpret null as zero', () => {
@@ -157,7 +195,7 @@ test('five percent weighting changes numeric scores while retaining measured cat
   const measured = assessment();
   const advice = parseFormAdvice(response(), fixture());
   const scored = blendFormAdvice(measured, advice);
-  assert.equal(scored.score, 98.3); // 100 * .95 + 65 * .05 (depth stays measured)
+  assert.equal(scored.score, 98.9); // 100 * .95 + 77.5 * .05 (depth and collapse stay measured)
   assert.equal(scored.jev.weight, 0.05);
   assert.equal(scored.rating, measured.rating);
   assert.equal(measured.score, 100);
@@ -212,8 +250,8 @@ test('adviser makes at most two requests per rep, one in flight, and ignores res
   resolve();
   await pending;
   const result = a.finalize(assessment());
-  assert.equal(result.score, 98.3);
-  assert.equal(result.jev.summary.schema, 'form-summary-v2');
+  assert.equal(result.score, 98.9);
+  assert.equal(result.jev.summary.schema, 'form-summary-v3');
   now += 600;
   const late = a.request({ ...fixture(), rep: 2, at: now });
   const frozen = a.finalize({ ...assessment(), rep: 2, completedAt: now });
@@ -302,13 +340,13 @@ test('early ascent reply survives a pending late refresh and keeps its own input
   const refresh = a.request(fixture());
   now = 14000;
   const rep = a.finalize(assessment());
-  assert.equal(rep.score, 98.3);
+  assert.equal(rep.score, 98.9);
   assert.equal(rep.jev.attempts, 2);
   assert.equal(rep.jev.summary.at, early.at);
   resolve();
   await refresh;
   assert.equal(a.advice, null);
-  assert.equal(rep.score, 98.3);
+  assert.equal(rep.score, 98.9);
 });
 
 test('feedback retains request failures and submitted inputs without exposing credentials', async (t) => {
@@ -325,7 +363,7 @@ test('feedback retains request failures and submitted inputs without exposing cr
   assert.equal(rep.jev.attempts, 1);
   assert.equal(rep.jev.httpStatus, 502);
   assert.match(rep.jev.reason, /rejected the API key/);
-  assert.equal(rep.jev.summary.schema, 'form-summary-v2');
+  assert.equal(rep.jev.summary.schema, 'form-summary-v3');
   const noRequest = new FormAdviser().finalize(assessment());
   assert.match(noRequest.jev.reason, /Not requested/);
 });

@@ -1,5 +1,11 @@
 export const WINDOW_MS = 10000;
-export type TraceKey = 'headInclination' | 'headPitch' | 'leftKnee' | 'rightKnee';
+export type TraceKey =
+  | 'headInclination'
+  | 'headPitch'
+  | 'leftKnee'
+  | 'rightKnee'
+  | 'leftKneeInward'
+  | 'rightKneeInward';
 export type DebugSample = { time: number; values: Record<TraceKey, number | null> };
 
 export function debugPath(

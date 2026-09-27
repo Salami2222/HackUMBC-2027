@@ -134,6 +134,37 @@ export function relativeChange(
   return parent.clone().invert().multiply(child).multiply(neutral.invert()).normalize();
 }
 
+/** Experimental frontal knee deviation, not an anatomical valgus diagnosis.
+ * SlimeVR uses +X toward the wearer's right and +Y along the leg toward the hip.
+ * The angle between the thigh's transverse axis and shin's longitudinal axis
+ * separates ideal flexion from inward deviation (joint-coordinate-system principle).
+ * Subtract the captured neutral angle; mirror the sign so inward is positive on both legs.
+ * Mounting/axis errors can still cause cross-talk; reference capture is not axis validation.
+ */
+export function kneeInwardAngle(
+  thigh: Quaternion,
+  shin: Quaternion,
+  neutralThigh: Quaternion,
+  neutralShin: Quaternion,
+  side: 'left' | 'right'
+): number | null {
+  const projection = (a: Quaternion, b: Quaternion) =>
+    new Vector3(1, 0, 0)
+      .applyQuaternion(a)
+      .dot(new Vector3(0, 1, 0).applyQuaternion(b));
+  const current = projection(thigh, shin);
+  const neutral = projection(neutralThigh, neutralShin);
+  // Nearly parallel axes make this decomposition unreliable. Do not invent a value.
+  if (
+    ![current, neutral].every(Number.isFinite) ||
+    Math.max(Math.abs(current), Math.abs(neutral)) > 0.995
+  )
+    return null;
+  const angle =
+    (side === 'left' ? 1 : -1) * (Math.asin(current) - Math.asin(neutral)) * DEGREES;
+  return angle === 0 ? 0 : angle;
+}
+
 const definitions = [
   {
     id: 'leftKnee',
@@ -209,6 +240,35 @@ export function measure(
   );
   const left = result[0],
     right = result[1];
+  for (const [side, thighPart, shinPart] of [
+    ['left', BodyPart.LEFT_UPPER_LEG, BodyPart.LEFT_LOWER_LEG],
+    ['right', BodyPart.RIGHT_UPPER_LEG, BodyPart.RIGHT_LOWER_LEG],
+  ] as const) {
+    const thigh = roles.find((r) => r.part === thighPart)!;
+    const shin = roles.find((r) => r.part === shinPart)!;
+    const neutralThigh = reference?.rotations.get(thighPart);
+    const neutralShin = reference?.rotations.get(shinPart);
+    const blocked =
+      thigh.reason ??
+      shin.reason ??
+      (!neutralThigh || !neutralShin ? 'Capture an upright reference' : null);
+    const value =
+      !blocked && thigh.rotation && shin.rotation && neutralThigh && neutralShin
+        ? kneeInwardAngle(
+            thigh.rotation,
+            shin.rotation,
+            neutralThigh,
+            neutralShin,
+            side
+          )
+        : null;
+    result.push({
+      id: `${side}KneeInward`,
+      label: `${side === 'left' ? 'Left' : 'Right'} knee inward (experimental)`,
+      value,
+      reason: blocked ?? (value == null ? 'Knee axes near singularity' : null),
+    });
+  }
   const head = roles.find((role) => role.part === BodyPart.HEAD)!;
   const neutralHead = reference?.rotations.get(BodyPart.HEAD);
   const inclination = (q: Quaternion) => {

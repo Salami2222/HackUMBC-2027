@@ -3,6 +3,11 @@ import { GROUPS } from '@/exercise/form-quality';
 import './DocumentationPage.scss';
 
 const ranges: Record<string, { range: string; meaning: string }> = {
+  collapse: {
+    range: '8–20° inward · experimental',
+    meaning:
+      'Signed thigh/shin deviation from the upright reference, checked separately per knee while bent at least 20°. The worse sustained side sets the deduction; both sides share one cap. Negative/outward movement is not penalized here.',
+  },
   symmetry: {
     range: '12–30° difference',
     meaning:
@@ -142,7 +147,7 @@ export function DocumentationPage() {
           can still miss the depth target. After the set,{' '}
           <Link to="/feedback">Feedback</Link> shows repeated issues and
           improvement cues and each rep’s weighted breakdown. Both modes use the
-          same four factors, targets and Jev review. Neither requires a baseline
+          same five factors, targets and Jev review. Neither requires a baseline
           or passing the other mode.
         </p>
       </section>
@@ -189,6 +194,14 @@ export function DocumentationPage() {
           completed rep’s peak bend instead. These are current experimental
           targets, not universal lifting standards.
         </p>
+        <p className="docs-note">
+          Inward deviation assumes SlimeVR’s calibrated segment axes match your
+          legs. Mounting errors and tracker drift can mix forward bending into
+          this estimate. Check both traces on Tracking against your movement
+          after calibration. The 8°, 18° and 20° limits are experimental testing
+          settings, not established safety limits. Equal inward movement of both
+          knees can trigger this factor even when knee symmetry is good.
+        </p>
         <div className="docs-ratings">
           <article className="docs-optimal">
             <h3>Optimal</h3>
@@ -208,9 +221,11 @@ export function DocumentationPage() {
           <article className="docs-attention">
             <h3>Needs attention</h3>
             <p>
-              Measured score below 65, with both knee symmetry and torso at 65%
-              severity or higher. Head or depth alone cannot trigger this
-              rating.
+              Measured score below 65, with at least two of inward-knee
+              deviation, symmetry and torso at 65% severity or higher. A
+              pronounced inward estimate of at least 18° on the same knee for
+              600 ms can also qualify with a score below 65. Head or depth alone
+              cannot trigger this rating.
             </p>
           </article>
         </div>
@@ -227,11 +242,11 @@ export function DocumentationPage() {
           <h2 id="docs-jev-title">Where Jev contributes</h2>
         </div>
         <p>
-          For form scoring, Jev reviews 22 curated values and four factor
+          For form scoring, Jev reviews 28 curated values and five factor
           summaries during ascent, with a second opportunity near the
           end—angles, durations, asymmetry and control—not the raw tracker
           stream. It can interpret patterns within the measured factors; the 98°
-          depth rule stays measurement-based.
+          depth rule and experimental inward-knee factor stay measurement-based.
         </p>
         <div className="docs-formula">
           <strong>Final score = 95% measured + 5% Jev proposal</strong>
@@ -253,10 +268,11 @@ export function DocumentationPage() {
       <footer className="docs-footer">
         <strong>What the system cannot tell you yet</strong>
         <p>
-          Knee collapse, hip/spine posture, heel contact, foot pressure, load
-          and core bracing are not assessed. IMU angles and IK positions are
-          estimates. The ratings describe the measured movement against our
-          configured targets; they are not an injury-risk prediction.
+          Confirmed anatomical knee collapse, hip/spine posture, heel contact,
+          foot pressure, load and core bracing are not assessed. IMU angles and
+          IK positions are estimates. The ratings describe the measured movement
+          against our configured targets; they are not an injury-risk
+          prediction.
         </p>
       </footer>
     </main>

@@ -1,6 +1,12 @@
 import { localRequestAllowed } from './tracking-service-plugin.mjs';
 
 export const metricKeys = [
+  'leftKneeInwardPeakDeg',
+  'rightKneeInwardPeakDeg',
+  'leftKneeInwardOver8Ms',
+  'rightKneeInwardOver8Ms',
+  'leftKneeInwardAtLeast18Ms',
+  'rightKneeInwardAtLeast18Ms',
   'observedDurationMs',
   'descentObservedMs',
   'bottomObservedMs',
@@ -24,8 +30,8 @@ export const metricKeys = [
   'headRollPeakDeg',
   'headTurnPeakDeg',
 ];
-const ids = ['symmetry', 'torso', 'depth', 'head'];
-const factors = ids.filter((id) => id !== 'depth');
+const ids = ['collapse', 'symmetry', 'torso', 'depth', 'head'];
+const factors = ids.filter((id) => !['depth', 'collapse'].includes(id));
 const unit = (v) => Number.isFinite(v) && v >= 0 && v <= 1;
 const exact = (o, keys) =>
   o &&
@@ -44,7 +50,7 @@ export function validFormReview(b) {
       'metrics',
       'groups',
     ]) &&
-    b.schema === 'form-summary-v2' &&
+    b.schema === 'form-summary-v3' &&
     ['ascent', 'late-ascent'].includes(b.stage) &&
     b.reference === 'upright-relative' &&
     Number.isInteger(b.rep) &&
@@ -104,7 +110,7 @@ export function formRequest(body) {
       units:
         'Angles are degrees relative to the upright reference; time is milliseconds; knee bend is zero upright. Null is unknown, never zero.',
       limitations:
-        'Ascent partial rep, not yet Ready. Only summarized estimated movement is available. No raw samples. Coverage is usable-data fraction, not probability. These are experimental targets, not injury predictions. Rep speed, tempo and foot position are excluded from scoring. Do not infer them or penalize phase durations. Do not infer hip/spine posture, inward knee collapse, foot pressure, load or bracing. Peaks alone do not establish sustained problems; issueMs is accumulated time in runs of at least 350ms. Measured severities use a square-root ramp after persistence filtering so moderate deviations contribute. No independent sensor corroboration is available.',
+        'Ascent partial rep, not yet Ready. Only summarized estimated movement is available. No raw samples. Coverage is usable-data fraction, not probability. These are experimental targets, not injury predictions. Rep speed, tempo and foot position are excluded from scoring. Do not infer them or penalize phase durations. Inward knee deviation is an experimental signed thigh/shin estimate, not a validated diagnosis; it remains measurement-only, as does depth. Its penalty range is 8 to 20 degrees with a 350ms persistence gate while that knee is bent at least 20 degrees. A same-knee run at least 18 degrees for 600ms plus a measured score below 65 may flag Needs attention. Per-side duration totals do not prove a continuous run. Do not replace this estimate, diagnose knee collapse or infer hip/spine posture, foot pressure, load or bracing. Peaks alone do not establish sustained problems; issueMs is accumulated time in runs of at least 350ms. Measured severities use a square-root ramp after persistence filtering so moderate deviations contribute. No independent sensor corroboration is available.',
       depthTargetDeg: 98,
       headInclinationLimitDeg: 35,
       metrics: Object.fromEntries(metricKeys.map((k) => [k, body.metrics[k]])),

@@ -16,7 +16,9 @@ import {
   MeasurementEngine,
   inspectRoles,
   relativeChange,
+  kneeInwardAngle,
 } from '../src/measurement/measurements.ts';
+import { evaluateFormRep } from '../src/exercise/form-quality.ts';
 
 const rotation = (axis, degrees) =>
   new Quaternion().setFromAxisAngle(
@@ -55,6 +57,93 @@ function referenced() {
   return value;
 }
 const metric = (state, id) => state.measurements.find((m) => m.id === id);
+
+test('signed inward deviation mirrors both knees and separates flexion through 135 degrees', () => {
+  const identity = new Quaternion();
+  for (const bend of [0, 30, 60, 89, 90, 98, 120, 135]) {
+    for (const side of ['left', 'right']) {
+      for (const inward of [-20, 0, 8, 18, 20]) {
+        // Flexion about thigh X, frontal deviation about floating Z, then shin twist.
+        const shin = rotation([1, 0, 0], bend)
+          .multiply(rotation([0, 0, 1], (side === 'left' ? -1 : 1) * inward))
+          .multiply(rotation([0, 1, 0], 25));
+        const value = kneeInwardAngle(identity, shin, identity, identity, side);
+        assert.ok(
+          Math.abs(value - inward) < 1e-8,
+          `${side} bend ${bend} inward ${inward}: ${value}`
+        );
+      }
+    }
+  }
+});
+
+test('inward measurement removes neutral offset and shared world rotation', () => {
+  const neutralThigh = rotation([0, 1, 0], 20);
+  const neutralShin = neutralThigh.clone().multiply(rotation([0, 0, 1], -5));
+  const thigh = neutralThigh.clone().multiply(rotation([1, 0, 0], -40));
+  const shin = thigh
+    .clone()
+    .multiply(rotation([1, 0, 0], 100))
+    .multiply(rotation([0, 0, 1], -25));
+  const heading = rotation([0, 1, 0], 135).multiply(rotation([0, 0, 1], 15));
+  for (const shared of [new Quaternion(), heading]) {
+    const q = (v) => shared.clone().multiply(v);
+    assert.ok(
+      Math.abs(
+        kneeInwardAngle(
+          q(thigh),
+          q(shin),
+          q(neutralThigh),
+          q(neutralShin),
+          'left'
+        ) - 20
+      ) < 1e-8
+    );
+  }
+});
+
+test('inward measurement remains unavailable for missing data and nearly parallel axes', () => {
+  const { engine, list } = referenced();
+  const shin = node(list, BodyPart.LEFT_LOWER_LEG);
+  setRotation(shin, rotation([0, 0, 1], 89));
+  engine.ingest(list, 4200);
+  assert.equal(metric(engine.state(4200), 'leftKneeInward').value, null);
+  setRotation(shin, new Quaternion());
+  shin.status = TrackerStatus.DISCONNECTED;
+  engine.ingest(list, 4300);
+  assert.equal(metric(engine.state(4300), 'leftKneeInward').value, null);
+  assert.equal(metric(engine.state(4300), 'rightKneeInward').value, 0);
+  assert.equal(metric(engine.state(5401), 'rightKneeInward').value, null);
+});
+
+test('real measurement output catches equal inward deviations even with matching knee bend', () => {
+  const { engine, list } = referenced();
+  const samples = [];
+  for (let i = 0; i <= 20; i++) {
+    for (const [part, sign] of [
+      [BodyPart.LEFT_LOWER_LEG, -1],
+      [BodyPart.RIGHT_LOWER_LEG, 1],
+    ])
+      setRotation(
+        node(list, part),
+        rotation([1, 0, 0], 105).multiply(rotation([0, 0, 1], sign * 22))
+      );
+    const at = 4200 + i * 100;
+    engine.ingest(list, at);
+    samples.push({
+      at,
+      phase: i < 10 ? 'descending' : 'ascending',
+      values: Object.fromEntries(
+        engine.state(at).measurements.map((m) => [m.id, m.value])
+      ),
+    });
+  }
+  const result = evaluateFormRep(samples, 1, 100, 6200);
+  assert.equal(result.groups.find((g) => g.id === 'symmetry').severity, 0);
+  assert.equal(result.groups.find((g) => g.id === 'collapse').severity, 1);
+  assert.equal(result.rating, 'attention');
+  assert.equal(result.score, 60);
+});
 
 test('legacy hand assignments stay intact and block calibration until moved to feet', () => {
   const { engine, list } = prepared();

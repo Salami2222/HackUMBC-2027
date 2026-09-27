@@ -117,7 +117,7 @@ export function SquatSessionPanel() {
       )}
       {sessionMode === 'form-test' ? (
         <p className="squat-notice">
-          Form Test: 3 reps · Symmetry, torso, depth and head control
+          Form Test: 3 reps · Inward knees, symmetry, torso, depth and head
         </p>
       ) : (
         <>

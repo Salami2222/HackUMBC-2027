@@ -8,21 +8,34 @@ export const FORM_LABELS: Record<FormRating, string> = {
   unknown: 'Insufficient data',
 };
 // Engineering defaults for the measured-movement profile, not clinical risk thresholds.
-export const FORM_PROFILE = 'measured-movement-v3';
+export const FORM_PROFILE = 'measured-movement-v4';
+// Engineering thresholds for tracker testing; not validated injury/safety limits.
+export const KNEE_INWARD_START_DEG = 8;
+export const KNEE_INWARD_FULL_DEG = 20;
+export const KNEE_INWARD_ATTENTION_DEG = 18;
+export const KNEE_INWARD_ATTENTION_MS = 600;
+export const KNEE_INWARD_MIN_BEND_DEG = 20;
 export const UNASSESSED =
-  'Rep speed and foot position are not scored. Knee collapse, hip / spine posture, heel contact, foot pressure, load and core bracing are not assessed.';
+  'Knee inward deviation is an experimental tracker estimate, not a validated knee-collapse diagnosis. Rep speed and foot position are not scored. Hip / spine posture, heel contact, foot pressure, load and core bracing are not assessed.';
 export const GROUPS = [
+  {
+    id: 'collapse',
+    label: 'Knee inward deviation (experimental)',
+    weight: 40,
+    critical: true,
+    cue: 'Review the inward-knee trace and tracker alignment; look for sustained inward drift during the squat.',
+  },
   {
     id: 'symmetry',
     label: 'Knee symmetry',
-    weight: 35,
+    weight: 20,
     critical: true,
     cue: 'Aim for both knees to bend and straighten together.',
   },
   {
     id: 'torso',
     label: 'Torso control',
-    weight: 30,
+    weight: 20,
     critical: true,
     cue: 'Keep your chest from tipping sideways or dropping further as you rise.',
   },
@@ -30,7 +43,7 @@ export const GROUPS = [
   {
     id: 'depth',
     label: 'Depth target',
-    weight: 30,
+    weight: 15,
     critical: false,
     cue: 'Review the depth trace against the configured 98° knee-bend target.',
   },
@@ -127,7 +140,8 @@ function motionWindow(samples: FormSample[], i: number) {
 /** Missing samples contribute no evidence. They never become zero-severity observations. */
 function sustained(
   samples: FormSample[],
-  read: (s: FormSample, i: number) => number | null
+  read: (s: FormSample, i: number) => number | null,
+  minimumMs = 350
 ) {
   let validMs = 0,
     runMs = 0,
@@ -136,7 +150,7 @@ function sustained(
     issueMs = 0;
   const duration = Math.max(100, samples.at(-1)!.at - samples[0].at + 100);
   const finishRun = () => {
-    if (runMs >= 350) {
+    if (runMs >= minimumMs) {
       // Concave ramp makes persistent moderate deviations matter, without lowering targets.
       severity = Math.max(severity, Math.sqrt(runSeverity / runMs));
       issueMs += runMs;
@@ -161,6 +175,16 @@ function sustained(
   });
   finishRun();
   return { severity, coverage: clamp(validMs / duration), issueMs };
+}
+
+function inwardEvidence(sample: FormSample, side: 'left' | 'right'): number | null {
+  const angle = sample.values[`${side}KneeInward`];
+  const bend = sample.values[`${side}Knee`];
+  if (!finite(angle) || !finite(bend)) return null;
+  return ['descending', 'bottom', 'ascending'].includes(sample.phase) &&
+    bend >= KNEE_INWARD_MIN_BEND_DEG
+    ? Math.max(0, angle)
+    : 0;
 }
 
 export function evaluateFormRep(
@@ -200,11 +224,41 @@ export function evaluateFormRep(
   });
   const headRoll = peak(['headRoll'], (s) => Math.abs(num(s, 'headRoll')));
   const headTurn = peak(['headTurn'], (s) => Math.abs(num(s, 'headTurn')));
+  const inward = (['left', 'right'] as const).map((side) => {
+    const measured = sustained(samples, (s) => {
+      const angle = inwardEvidence(s, side);
+      return angle == null
+        ? null
+        : excess(angle, KNEE_INWARD_START_DEG, KNEE_INWARD_FULL_DEG);
+    });
+    const strong = sustained(
+      samples,
+      (s) => {
+        const angle = inwardEvidence(s, side);
+        return angle == null ? null : angle >= KNEE_INWARD_ATTENTION_DEG ? 1 : 0;
+      },
+      KNEE_INWARD_ATTENTION_MS
+    );
+    const angles = samples.map((s) => inwardEvidence(s, side)).filter(finite);
+    return {
+      ...measured,
+      strong: strong.severity > 0,
+      peak: angles.length ? Math.max(...angles) : null,
+    };
+  });
+  const inwardPeak = (value: number | null) =>
+    value == null ? 'unknown' : `${value.toFixed(1)}°`;
 
   const observations: Record<
     GroupId,
     { severity: number; coverage: number; issueMs: number; evidence: string }
   > = {
+    collapse: {
+      severity: Math.max(...inward.map((v) => v.severity)),
+      coverage: Math.min(...inward.map((v) => v.coverage)),
+      issueMs: Math.max(...inward.map((v) => v.issueMs)),
+      evidence: `Inward peak while bent: left ${inwardPeak(inward[0].peak)}, right ${inwardPeak(inward[1].peak)}. Experimental ${KNEE_INWARD_START_DEG}–${KNEE_INWARD_FULL_DEG}° penalty range; positive means inward.`,
+    },
     symmetry: {
       ...sustained(samples, (s) =>
         has(s, ['leftKnee', 'rightKnee'])
@@ -258,8 +312,10 @@ export function evaluateFormRep(
     10;
   const issues = groups.filter((g) => g.severity >= 0.15);
   const severeGroups = groups.filter((g) => g.critical && g.severity >= 0.65);
-  // Cap each group, and require separate substantial issues before the red band.
-  const attention = score < 65 && severeGroups.length >= 2;
+  // Single-factor exception requires pronounced measured inward drift on the SAME
+  // knee for >=600 ms, full coverage and a low score. Two bad knees share one cap.
+  const pronouncedInward = inward.some((v) => v.strong);
+  const attention = score < 65 && (severeGroups.length >= 2 || pronouncedInward);
   return {
     rep,
     score,
@@ -270,13 +326,16 @@ export function evaluateFormRep(
         : 'optimal',
     coverage,
     groups,
-    reason: '',
+    reason:
+      attention && pronouncedInward
+        ? `Sustained experimental inward-knee estimate ≥${KNEE_INWARD_ATTENTION_DEG}° for at least ${KNEE_INWARD_ATTENTION_MS} ms; measured score below 65.`
+        : '',
     completedAt: at,
   };
 }
 
 export interface FormReview {
-  schema: 'form-summary-v2';
+  schema: 'form-summary-v3';
   rep: number;
   at: number;
   stage: 'ascent' | 'late-ascent';
@@ -332,8 +391,30 @@ export function summarizeFormReview(
   const bilateralPeak = knees.length
     ? Math.max(...knees.map((s) => Math.min(s.values.leftKnee!, s.values.rightKnee!)))
     : null;
+  const inwardMetrics = Object.fromEntries(
+    (['left', 'right'] as const).flatMap((side) => {
+      const angles = samples.map((s) => inwardEvidence(s, side)).filter(finite);
+      const duration = (limit: number) =>
+        angles.length
+          ? elapsed((s) => {
+              const angle = inwardEvidence(s, side);
+              return angle != null && angle >= limit;
+            })
+          : null;
+      return [
+        [`${side}KneeInwardPeakDeg`, angles.length ? round(Math.max(...angles)) : null],
+        [
+          `${side}KneeInwardOver8Ms`,
+          angles.length
+            ? elapsed((s) => (inwardEvidence(s, side) ?? 0) > KNEE_INWARD_START_DEG)
+            : null,
+        ],
+        [`${side}KneeInwardAtLeast18Ms`, duration(KNEE_INWARD_ATTENTION_DEG)],
+      ];
+    })
+  );
   return {
-    schema: 'form-summary-v2',
+    schema: 'form-summary-v3',
     rep: assessment.rep,
     at: last.at,
     stage:
@@ -342,6 +423,7 @@ export function summarizeFormReview(
         : 'ascent',
     reference: 'upright-relative',
     metrics: {
+      ...inwardMetrics,
       observedDurationMs: last.at - samples[0].at,
       descentObservedMs: elapsed((s) => s.phase === 'descending'),
       bottomObservedMs: elapsed((s) => s.phase === 'bottom'),

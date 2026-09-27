@@ -64,10 +64,6 @@ export const PresentationPerformance = memo(function PresentationPerformance() {
       data-mode={sessionMode}
     >
       <div className="presentation-reps">
-        <SessionModeSelect
-          id="presentation-session-type"
-          className="presentation-session-mode"
-        />
         <div className="presentation-stat-heading">
           {sessionMode === 'form-test' ? 'Form Test' : 'Working Set'}
           <button
@@ -152,7 +148,7 @@ export const PresentationPerformance = memo(function PresentationPerformance() {
           ) : (
             <>
               <p className="presentation-eyebrow">Measured form</p>
-              <p>Three reps · Symmetry, torso, depth and head control</p>
+              <p>Three reps · Inward knees, symmetry, torso, depth and head</p>
               <ol className="presentation-form-test-reps">
                 {Array.from({ length: targetRepCount }, (_, index) => {
                   const rep = formTestReps[index];
@@ -346,6 +342,7 @@ export function PresentationDashboard({
       >
         <summary aria-label="Session and calibration options">•••</summary>
         <div className="presentation-menu-content">
+          <SessionModeSelect id="presentation-session-type" />
           <button
             disabled={!session.canMeasure || active}
             onClick={session.startSession}

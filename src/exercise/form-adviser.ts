@@ -179,9 +179,10 @@ export function blendFormAdvice(
     100 -
     rep.groups.reduce((sum, g) => {
       const f = advice.factors[g.id];
-      // Depth remains numeric. An uncertain factor keeps its measured severity.
+      // Depth and experimental inward deviation remain measurement-only.
       const eligible =
         g.id !== 'depth' &&
+        g.id !== 'collapse' &&
         g.coverage >= 0.85 &&
         f &&
         !f.uncertain &&
