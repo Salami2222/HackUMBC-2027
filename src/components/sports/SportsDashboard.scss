@@ -65,15 +65,11 @@
   }
 
   .brand-mark {
-    display: grid;
-    place-items: center;
-    width: 30px;
-    height: 38px;
+    display: block;
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
     flex: none;
-    color: var(--ml-accent-soft);
-    font-size: 27px;
-    font-weight: 800;
-    letter-spacing: -0.09em;
   }
 
   .sports-brand strong {
@@ -1107,7 +1103,7 @@
 
   .node-setup-content {
     display: grid;
-    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 36px;
     padding: 24px 0;
     border-top: 1px solid var(--ml-border);
@@ -1416,7 +1412,8 @@
   }
 
   .sports-header {
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     padding-inline: max(36px, calc((100vw - 1400px) / 2));
   }
 
@@ -1425,6 +1422,7 @@
   }
 
   .sports-nav {
+    grid-column: 2;
     display: flex;
     align-items: stretch;
     gap: 30px;
@@ -1495,13 +1493,6 @@
     }
   }
 
-  .tracking-hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1.65fr) minmax(270px, 0.65fr);
-    gap: clamp(38px, 5vw, 80px);
-    align-items: stretch;
-  }
-
   .tracking-stage,
   .sensor-preview {
     display: flex;
@@ -1559,42 +1550,6 @@
     text-transform: none;
   }
 
-  .session-sidebar {
-    display: flex;
-    flex-direction: column;
-    padding: 6px 0 0;
-
-    h2 {
-      margin: 12px 0 16px;
-      font-size: 32px;
-      font-weight: 600;
-      letter-spacing: -0.06em;
-    }
-  }
-
-  .session-exercise {
-    display: block;
-    margin: 9px 0 15px;
-
-    select {
-      max-width: 100%;
-      padding: 0 24px 0 0;
-      border: 0;
-      color: var(--ml-text);
-      background: transparent;
-      font-size: 32px;
-      font-weight: 600;
-      letter-spacing: -0.06em;
-      cursor: pointer;
-    }
-
-    option {
-      color: var(--ml-text);
-      background: var(--ml-surface);
-      font-size: 14px;
-    }
-  }
-
   .session-state,
   .calibration-status {
     display: flex;
@@ -1617,83 +1572,6 @@
     }
   }
 
-  .rep-readout {
-    display: flex;
-    align-items: baseline;
-    margin-top: 45px;
-
-    span {
-      align-self: start;
-      margin-top: 9px;
-      margin-right: auto;
-      color: var(--ml-subtle);
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-    }
-
-    strong {
-      font-size: 64px;
-      font-weight: 500;
-      letter-spacing: -0.09em;
-      line-height: 1;
-    }
-
-    small {
-      margin-left: 8px;
-      color: var(--ml-subtle);
-      font-size: 16px;
-    }
-  }
-
-  .rep-track {
-    height: 4px;
-    margin: 18px 0 22px;
-    overflow: hidden;
-    border-radius: 4px;
-    background: #393249;
-
-    span {
-      display: block;
-      height: 100%;
-      border-radius: inherit;
-      background: var(--ml-accent);
-      transition: width 0.25s ease;
-    }
-  }
-
-  .baseline-status {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    padding-bottom: 20px;
-    color: var(--ml-muted);
-    font-size: 11px;
-
-    strong {
-      color: var(--ml-text);
-      font-weight: 550;
-      text-align: right;
-    }
-  }
-
-  .session-actions {
-    display: grid;
-    gap: 8px;
-    padding-top: 19px;
-    border-top: 1px solid var(--ml-border);
-
-    button {
-      width: 100%;
-      min-height: 42px;
-      text-align: center;
-    }
-
-    .secondary-button {
-      border: 1px solid var(--ml-border-strong);
-    }
-  }
-
   .text-button {
     border: 0;
     color: var(--ml-muted);
@@ -1703,120 +1581,6 @@
     &:not(:disabled):hover {
       color: var(--ml-text);
     }
-  }
-
-  .movement-status {
-    display: grid;
-    gap: 7px;
-    margin-top: auto;
-    padding-top: 29px;
-
-    strong {
-      font-size: 13px;
-      font-weight: 550;
-    }
-
-    small {
-      color: var(--ml-muted);
-      font-size: 11px;
-    }
-  }
-
-  .movement-graphs {
-    margin-top: 58px;
-  }
-
-  .section-heading {
-    display: flex;
-    justify-content: space-between;
-    align-items: end;
-    gap: 16px;
-    margin-bottom: 17px;
-
-    h2 {
-      margin: 5px 0 0;
-      font-size: 22px;
-      font-weight: 600;
-      letter-spacing: -0.05em;
-    }
-  }
-
-  .graph-caption {
-    color: var(--ml-subtle);
-    font-size: 10px;
-  }
-
-  .graph-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 55px;
-  }
-
-  .movement-graph {
-    position: relative;
-    min-width: 0;
-    padding: 19px 0 15px;
-    border-top: 1px solid var(--ml-border);
-
-    svg {
-      display: block;
-      width: 100%;
-      height: 118px;
-      margin-top: 10px;
-    }
-  }
-
-  .graph-header,
-  .graph-legend {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-  }
-
-  .graph-header {
-    justify-content: space-between;
-
-    h3 {
-      margin: 0;
-      font-size: 12px;
-      font-weight: 550;
-    }
-  }
-
-  .graph-legend span {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    color: var(--ml-subtle);
-    font-size: 10px;
-
-    i {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-    }
-  }
-
-  .graph-gridline {
-    stroke: #3b334d;
-    stroke-width: 1;
-    stroke-dasharray: 2 5;
-  }
-
-  .graph-baseline {
-    stroke-width: 1.5;
-    stroke-dasharray: 5 5;
-    opacity: 0.55;
-  }
-
-  .graph-empty {
-    position: absolute;
-    top: 52%;
-    left: 50%;
-    color: var(--ml-subtle);
-    font-size: 11px;
-    white-space: nowrap;
-    transform: translate(-50%, -50%);
   }
 
   .calibration-layout {
@@ -1902,14 +1666,6 @@
     .session-sidebar,
     .calibration-controls {
       max-width: none;
-    }
-
-    .rep-readout {
-      margin-top: 25px;
-    }
-
-    .movement-status {
-      margin-top: 0;
     }
   }
 }
@@ -2085,6 +1841,15 @@
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
+  }
+  .calibration-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 24px;
+  }
+  .sensor-preview .stage-footer,
+  .node-manager .panel-top {
+    justify-content: flex-end;
   }
   .node-manager {
     margin-top: 32px;

@@ -34,8 +34,13 @@ function AppSurface() {
     <div className="sports-app">
       <header className="sports-header">
         <div className="sports-brand">
-          <div className="brand-mark">M</div>
-          <strong>MotionLab</strong>
+          <img
+            className="brand-mark"
+            src="/kinetiq-squat.svg"
+            alt="Kinetiq"
+            width="36"
+            height="36"
+          />
         </div>
         <nav className="sports-nav" aria-label="Main navigation">
           <NavLink to="/" end>

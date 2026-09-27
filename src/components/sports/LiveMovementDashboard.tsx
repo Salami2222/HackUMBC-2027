@@ -189,12 +189,11 @@ export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
   };
 
   return (
-    <main className="sports-content calibration-screen">
-      <div className="tracking-intro">
-        <div>
-          <span className="eyebrow">Body nodes / live hardware</span>
-          <h1>Sensor Calibration</h1>
-        </div>
+    <main
+      className="sports-content calibration-screen"
+      aria-label="Sensor Calibration"
+    >
+      <div className="calibration-toolbar">
         <div className="calibration-top-actions">
           <button
             className="secondary-button"
@@ -216,10 +215,6 @@ export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
           className="calibration-controls"
           aria-label="Calibrate a sensor"
         >
-          <p className="calibration-lead">
-            Connect your nodes, assign each to its body position, then use
-            Auto-orient trackers to calibrate how they are worn.
-          </p>
           <div className="calibration-status" role="status">
             <i className={live ? 'is-running' : ''} />
             <span>{status}</span>
@@ -353,29 +348,16 @@ export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
               {calibrationMessage}
             </p>
           )}
-          <div className="sensor-readout">
-            <span>
-              {fresh ? available.length : 0} nodes online ·{' '}
-              {fresh ? assignedOnline.length : 0} assigned online
-            </span>
-            {angles && (
+          {angles && (
+            <div className="sensor-readout">
               <span data-testid="node-orientation">
                 {position?.label} · pitch {angles.x.toFixed(1)}° · yaw{' '}
                 {angles.y.toFixed(1)}° · roll {angles.z.toFixed(1)}°
               </span>
-            )}
-          </div>
-          <p className="calibration-footnote">
-            The skeleton uses all assigned online nodes. Missing segments are
-            estimated. Live orientation is not a joint angle or lifting score;
-            the Tracking tab uses a separate simulated exercise stream.
-          </p>
+            </div>
+          )}
         </section>
         <section className="sensor-preview" aria-label="Live skeleton preview">
-          <div className="stage-title">
-            <span>Live skeleton preview</span>
-            <span>{skeletonLive ? 'LIVE' : 'NO LIVE POSE'}</span>
-          </div>
           <div className="sports-viewport">
             {active && skeletonLive ? (
               <SkeletonVisualizerWidget
@@ -405,11 +387,6 @@ export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
             )}
           </div>
           <div className="stage-footer">
-            <span>
-              {skeletonLive
-                ? `${assignedOnline.length} assigned / ${available.length} online · missing segments estimated`
-                : 'Waiting for live tracking data'}
-            </span>
             <div className="view-buttons" aria-label="Skeleton view">
               <button
                 disabled={!skeletonLive}
@@ -472,20 +449,11 @@ export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
         aria-label="Node connection manager"
       >
         <div className="panel-top">
-          <div>
-            <span className="panel-index">CONNECTION MANAGER</span>
-            <h2>Your nodes</h2>
-          </div>
           <span className="panel-tag">
             {fresh ? available.length : 0} ONLINE ·{' '}
             {fresh ? assignedOnline.length : 0} ASSIGNED ONLINE
           </span>
         </div>
-        <p className="node-manager-description">
-          Each row is a separate physical node. Online means it is sending
-          tracking data now. USB setup success alone does not mean a node is
-          still online.
-        </p>
         {trackers.length === 0 ? (
           <p className="node-manager-description">
             No nodes detected. Open Connect nodes to set up Wi-Fi over USB.

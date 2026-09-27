@@ -1,28 +1,23 @@
 {
-  "name": "SlimeVR GUI",
-  "short_name": "SlimeVR GUI",
-  "description": "A web interface for controlling the SlimeVR Server software",
+  "name": "Kinetiq",
+  "short_name": "Kinetiq",
+  "description": "Movement tracking and weightlifting form analysis",
   "display": "standalone",
-  "theme_color": "#663499",
-  "background_color": "#663499",
+  "theme_color": "#11101a",
+  "background_color": "#11101a",
   "icons": [
     {
-      "src": "logo.svg",
+      "src": "kinetiq-squat.svg",
       "type": "image/svg+xml",
-      "sizes": "any 512x512 192x192"
+      "sizes": "any"
     },
     {
-      "src": "favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
-    },
-    {
-      "src": "logo192.png",
+      "src": "kinetiq-192.png",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "logo512.png",
+      "src": "kinetiq-512.png",
       "type": "image/png",
       "sizes": "512x512"
     }

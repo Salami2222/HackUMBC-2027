@@ -300,11 +300,9 @@ type PreviewContext = ReturnType<typeof initializePreview>;
 function SkeletonVisualizer({
   onInit,
   disabled = false,
-  bonesOverride,
 }: {
   onInit: (context: PreviewContext) => void;
   disabled?: boolean;
-  bonesOverride?: BoneT[];
 }) {
   const { config } = useConfig();
 
@@ -315,8 +313,8 @@ function SkeletonVisualizer({
   const _bones = useAtomValue(bonesAtom);
 
   const bones = useMemo(() => {
-    return new Map((bonesOverride ?? _bones).map((b) => [b.bodyPart, b]));
-  }, [_bones, bonesOverride]);
+    return new Map(_bones.map((b) => [b.bodyPart, b]));
+  }, [_bones]);
 
   useEffect(() => {
     if (bones.size === 0) return;
@@ -407,12 +405,10 @@ export function SkeletonVisualizerWidget({
   },
   disabled = false,
   toggleDisabled,
-  bonesOverride,
 }: {
   onInit?: (context: PreviewContext) => void;
   disabled?: boolean;
   toggleDisabled?: () => void;
-  bonesOverride?: BoneT[];
 }) {
   const { l10n } = useLocalization();
   const [error, setError] = useState(false);
@@ -425,11 +421,7 @@ export function SkeletonVisualizerWidget({
         })}
       >
         <ErrorBoundary onError={() => setError(true)} fallback={<></>}>
-          <SkeletonVisualizer
-            onInit={onInit}
-            disabled={disabled}
-            bonesOverride={bonesOverride}
-          />
+          <SkeletonVisualizer onInit={onInit} disabled={disabled} />
         </ErrorBoundary>
       </div>
       <div

@@ -72,7 +72,7 @@ export function MainLinks() {
         {l10n.getString('navbar-home')}
       </NavButton>
       <NavButton to="/" icon={<HumanIcon />}>
-        MotionLab
+        Kinetiq
       </NavButton>
       <NavButton
         to="/onboarding/trackers-assign"

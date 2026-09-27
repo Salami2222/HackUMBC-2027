@@ -24,7 +24,7 @@ const statusMessages: Record<WifiProvisioningStatus, string> = {
   [WifiProvisioningStatus.CONNECTING]:
     'The node is joining your Wi-Fi network…',
   [WifiProvisioningStatus.LOOKING_FOR_SERVER]:
-    'Wi-Fi connected. Looking for MotionLab…',
+    'Wi-Fi connected. Looking for Kinetiq…',
   [WifiProvisioningStatus.DONE]:
     'Wi-Fi setup completed. This does not indicate current tracking status. Select the node marked Online and save its body position to see live movement. Keep it powered on after unplugging USB.',
   [WifiProvisioningStatus.CONNECTION_ERROR]:
@@ -64,7 +64,7 @@ export function NodeSetup({
       setNearby({});
       if (owned.current) {
         setError(
-          'Connection to the local service was lost. Reconnect, then enter your Wi-Fi details to retry.'
+          'Connection to the local service was lost. Reconnect, then retry setup.'
         );
         owned.current = false;
         interrupted.current = true;
@@ -176,7 +176,6 @@ export function NodeSetup({
       RpcMessage.StartWifiProvisioningRequest,
       new StartWifiProvisioningRequestT(ssid, password, port || null)
     );
-    setPassword('');
   };
   const stop = () => {
     sendRPCPacket(
@@ -185,7 +184,6 @@ export function NodeSetup({
     );
     owned.current = false;
     setActive(false);
-    setPassword('');
     setError('');
   };
 
@@ -236,22 +234,6 @@ export function NodeSetup({
       )}
       {open && (
         <div id="node-setup-content" className="node-setup-content">
-          <div className="node-setup-guide">
-            <h3>Plug in. Power on. Connect.</h3>
-            <p>
-              For a new node, enter your Wi-Fi details and start USB setup. Plug
-              in nodes one at a time; MotionLab detects and connects them
-              automatically. Stop USB setup when you are finished.
-            </p>
-            <p>
-              Once configured, nodes remember their Wi-Fi and reconnect when you
-              turn them on. USB is only needed for setup or charging.
-            </p>
-            <p className="node-setup-hint">
-              Use the same 2.4 GHz network as this computer. For an iPhone
-              hotspot, enable Maximize Compatibility.
-            </p>
-          </div>
           <form
             className="node-wifi-form sentry-mask"
             autoComplete="off"
@@ -274,12 +256,14 @@ export function NodeSetup({
               Wi-Fi password
               <input
                 name="wifi-password"
-                type="password"
+                type="text"
                 autoComplete="new-password"
                 value={password}
                 disabled={active}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder={active ? 'Sent to node setup' : 'Password'}
+                placeholder="Password"
+                spellCheck={false}
+                autoCapitalize="none"
                 maxLength={63}
               />
             </label>
@@ -306,7 +290,7 @@ export function NodeSetup({
             />
             <p className="node-privacy-note">
               Wi-Fi details are sent to your node through the local service.
-              MotionLab does not save them in browser storage.
+              Kinetiq does not save them in browser storage.
             </p>
             <div className="node-setup-actions">
               {active ? (
@@ -333,14 +317,11 @@ export function NodeSetup({
           </form>
         </div>
       )}
-      {(open || active || error) && (
+      {(active || error || (open && !isConnected)) && (
         <div className="node-setup-status" role="status">
           {!isConnected
             ? 'Local tracking service is offline. Start it on this computer to connect nodes.'
-            : error ||
-              (active
-                ? statusMessages[status]
-                : 'Ready. Previously configured nodes reconnect automatically.')}
+            : error || statusMessages[status]}
         </div>
       )}
     </section>
