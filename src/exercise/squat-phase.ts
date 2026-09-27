@@ -41,6 +41,8 @@ export const PHASE_LABELS: Record<SquatPhase, string> = {
 };
 export const SESSION_REPS = 8;
 export const PHASE_MAX_GAP_MS = 500;
+export const TOP_KNEE_BEND_DEG = 10;
+const TOP_EXIT_DEG = 12;
 const median = (values: number[]) =>
   [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 const initial = (): PhaseState => ({
@@ -78,6 +80,7 @@ export class SquatPhaseDetector {
   private candidateAt = 0;
   private startedAt = 0;
   private bottomAt = 0;
+  private topConfirmedAt = 0;
   private minAscent = Infinity;
   private standingHead: number | null = null;
   private peaks: PhasePeaks = {
@@ -95,6 +98,7 @@ export class SquatPhaseDetector {
     this.candidateAt = 0;
     this.startedAt = 0;
     this.bottomAt = 0;
+    this.topConfirmedAt = 0;
     this.minAscent = Infinity;
     this.standingHead = null;
     this.peaks = {
@@ -175,8 +179,19 @@ export class SquatPhaseDetector {
       Math.max(...this.history.map((s) => (s.left + s.right) / 2)) -
       Math.min(...this.history.map((s) => (s.left + s.right) / 2));
     const upright =
-      Math.max(current.left, current.right) <= 10 &&
+      Math.max(current.left, current.right) <= TOP_KNEE_BEND_DEG &&
       (Math.abs(kneeSpeed) < 5 || kneeRange <= 4);
+    // The velocity window and median lag behind a quick return to straight legs.
+    // Confirm the top with paired raw readings instead: never a single spike,
+    // nor each leg reaching the range at a different time. A 2-degree exit
+    // margin tolerates one noisy reading without requiring a pause at the top.
+    const topReadings = this.raw.filter(
+      (s) => at - s.at <= 250 && Math.max(s.left, s.right) <= TOP_KNEE_BEND_DEG
+    );
+    const topReached =
+      Math.max(left, right) <= TOP_EXIT_DEG &&
+      topReadings.length >= 2 &&
+      topReadings.at(-1)!.at - topReadings[0].at >= 40;
     const down = leftSpeed > 2 && rightSpeed > 2 && kneeSpeed > 5;
     const up = leftSpeed < -2 && rightSpeed < -2 && kneeSpeed < -5;
     const freshAdvice =
@@ -266,23 +281,31 @@ export class SquatPhaseDetector {
     }
     if (this.state.phase === 'bottom') {
       // One latched turning point, held briefly for a readable phase transition.
-      if (at - this.bottomAt >= 180 && (up || upright)) this.enter('ascending', at);
+      // Do not let that display hold lose a fast rep which already reached the top.
+      if (topReached || (at - this.bottomAt >= 180 && (up || upright))) {
+        this.enter('ascending', at);
+        this.topConfirmedAt = topReached ? at : 0;
+      }
       return null;
     }
     this.minAscent = Math.min(this.minAscent, movement);
-    if (down && movement - this.minAscent > 12) {
-      if (this.confirm('abort', true, at, 350))
-        this.reset('Movement reversed. Stand upright to restart.');
-      return null;
-    }
-    if (this.confirm('complete', upright, at, 250)) {
+    if (topReached || (this.topConfirmedAt > 0 && at - this.topConfirmedAt <= 250)) {
       const complete =
         at - this.startedAt >= 700 && this.peaks.maxBilateralKneeFlexion >= 20;
       const result = { ...this.peaks };
       this.enter('ready', at);
       this.startedAt = 0;
+      this.topConfirmedAt = 0;
       return complete ? result : null;
     }
+    this.topConfirmedAt = 0;
+    if (down && movement - this.minAscent > 12) {
+      if (this.confirm('abort', true, at, 350))
+        this.reset('Movement reversed. Stand upright to restart.');
+      return null;
+    }
+    // Clear a previous reversal candidate when normal ascent resumes.
+    this.confirm('abort', false, at, 350);
     return null;
   }
 }

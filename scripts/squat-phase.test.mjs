@@ -235,3 +235,55 @@ test('invalid readings and explicit reset discard the partial rep', () => {
   r.rep();
   assert.equal(r.reps.length, 1);
 });
+
+for (const hz of [10, 20, 40])
+  test(`continuous reps count at the top without a standing pause at ${hz} Hz`, () => {
+    const r = rig({ hz, head: false });
+    r.hold(0, 1);
+    for (let i = 0; i < 8; i++) {
+      r.ramp(100, 1);
+      r.ramp(0, 1);
+      assert.equal(r.reps.length, i + 1);
+      assert.equal(r.detector.state.phase, 'ready');
+    }
+    r.hold(0, 2);
+    assert.equal(r.reps.length, 8);
+  });
+
+test('top-out uses the 0–10 degree band without requiring low velocity', () => {
+  const r = rig({ hz: 20 });
+  r.hold(0, 1);
+  r.ramp(100, 1.5);
+  r.ramp(8, 1.5);
+  r.sample(9);
+  assert.equal(r.reps.length, 1);
+  assert.equal(r.detector.state.phase, 'ready');
+  assert.ok(r.detector.state.kneeSpeed < -5);
+});
+
+test('a single false straight-leg packet or only one straight knee cannot complete a rep', () => {
+  const r = rig({ hz: 20 });
+  r.hold(0, 1);
+  r.ramp(100, 1.5);
+  r.ramp(25, 1.5);
+  r.sample(0);
+  r.hold(25, 0.3);
+  assert.equal(r.reps.length, 0);
+  for (let i = 0; i < 8; i++) r.sample(i % 2 ? 0 : 18, i % 2 ? 18 : 0);
+  assert.equal(r.reps.length, 0);
+});
+
+test('stationary knees above the top band do not count, and small top jitter counts once', () => {
+  const r = rig({ hz: 20 });
+  r.hold(0, 1);
+  r.ramp(100, 1.5);
+  r.ramp(15, 1.5);
+  r.hold(15, 1);
+  assert.equal(r.reps.length, 0);
+  r.sample(9);
+  r.sample(11);
+  r.sample(9);
+  assert.equal(r.reps.length, 1);
+  r.hold(9, 1, 2);
+  assert.equal(r.reps.length, 1);
+});

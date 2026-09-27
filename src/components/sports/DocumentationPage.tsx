@@ -112,7 +112,9 @@ export function DocumentationPage() {
         <ol className="docs-phases">
           <li>
             <strong>Ready</strong>
-            <span>Upright and steady; both knees at 10° bend or less.</span>
+            <span>
+              Both knees at 0–10° bend. Stand steady initially to start.
+            </span>
           </li>
           <li>
             <strong>Descending</strong>
@@ -127,17 +129,18 @@ export function DocumentationPage() {
           <li>
             <strong>Ascending</strong>
             <span>
-              The legs straighten until a stable return to Ready completes the
-              rep.
+              Two recent readings with both knees in the top range complete the
+              rep. You do not need to pause before descending again.
             </span>
           </li>
         </ol>
         <p>
           Knee motion leads. Estimated head-height movement and fresh Jev advice
           can adjust confirmation timing, but cannot create a rep. Filtering and
-          brief confirmation holds prevent phase flicker; a pause halfway down
-          is not the bottom. A tracking gap over 0.5 seconds discards the
-          unfinished rep.
+          brief confirmation checks prevent phase flicker; a 2° exit tolerance
+          handles top-out noise. Stillness is required only to arm tracking
+          initially. A pause halfway down is not the bottom. A tracking gap over
+          0.5 seconds discards the unfinished rep.
         </p>
         <p>
           Start an eight-rep set from{' '}
