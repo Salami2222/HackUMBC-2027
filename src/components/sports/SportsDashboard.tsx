@@ -15,6 +15,7 @@ import {
   SkeletonVisualizerWidget,
 } from '@/components/widgets/SkeletonVisualizerWidget';
 import './SportsDashboard.scss';
+import { ImuAngleGraphs } from './ImuAngleGraphs';
 
 export function SportsDashboard({ active = true }: { active?: boolean }) {
   const { isConnected, useDataFeedPacket } = useWebsocketAPI();
@@ -121,6 +122,7 @@ export function SportsDashboard({ active = true }: { active?: boolean }) {
           </div>
         </div>
       </section>
+      <ImuAngleGraphs />
     </main>
   );
 }

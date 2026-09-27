@@ -32,6 +32,8 @@ Attach the nodes securely, stand upright facing forward, then choose **Reset upr
 
 ## Checks
 
+The Tracking page also plots each physical node's calibrated pitch, yaw, and roll in degrees over the last ten seconds. These are IMU orientations (YZX Euler convention), not joint angles or form scores. Missing/invalid rotations, offline nodes, and zero packet rates do not produce angle values. Readouts become unavailable after three seconds without a fresh sample. Graphs break at missing samples, gaps over half a second, and angle wrapping; calibration resets and reconnects clear their history. Samples stay in page memory only.
+
 ```sh
 npm run typecheck
 npm run lint

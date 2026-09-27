@@ -1896,3 +1896,98 @@
     margin-top: 24px;
   }
 }
+
+.sports-app {
+  .imu-angle-graphs {
+    margin-top: 26px;
+  }
+
+  .imu-graph-note,
+  .imu-graph-empty {
+    color: var(--ml-muted);
+    font-size: 11px;
+    margin: 0 0 18px;
+  }
+
+  .imu-graph-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px 40px;
+  }
+
+  .imu-angle-graph {
+    min-width: 0;
+    padding-top: 18px;
+    border-top: 1px solid var(--ml-border);
+
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      margin-top: 16px;
+    }
+
+    svg text {
+      fill: var(--ml-muted);
+      font-size: 9px;
+    }
+
+    svg line {
+      stroke: var(--ml-border);
+      stroke-dasharray: 2 5;
+    }
+  }
+
+  .imu-graph-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+
+    h2 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    > span {
+      color: var(--ml-muted);
+      font-size: 10px;
+      text-align: right;
+    }
+  }
+
+  .imu-graph-values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 20px;
+    color: var(--ml-muted);
+    font-size: 11px;
+
+    span {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    i {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    strong {
+      min-width: 48px;
+      color: var(--ml-text);
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+}
+
+@media (max-width: 700px) {
+  .sports-app .imu-graph-grid {
+    grid-template-columns: 1fr;
+  }
+}
