@@ -2099,3 +2099,154 @@
   gap: 16px;
   margin-bottom: 8px;
 }
+
+.sports-app .squat-session {
+  margin: 28px 0;
+  padding: 24px 0;
+  border-top: 1px solid var(--ml-border);
+  border-bottom: 1px solid var(--ml-border);
+
+  .squat-session-heading,
+  .squat-progress,
+  .warmup-result li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .squat-session-heading {
+    margin-bottom: 20px;
+
+    h2 {
+      margin: 4px 0 0;
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    > span {
+      color: var(--ml-muted);
+      font-size: 11px;
+    }
+  }
+
+  .squat-progress {
+    justify-content: flex-start;
+    gap: 60px;
+    margin-bottom: 20px;
+
+    > div {
+      display: grid;
+      gap: 4px;
+    }
+
+    span,
+    small {
+      color: var(--ml-muted);
+      font-size: 11px;
+    }
+
+    strong {
+      font-size: 21px;
+      font-weight: 550;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  .squat-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .warmup-result {
+    max-width: 510px;
+
+    h3 {
+      margin: 0 0 18px;
+      font-size: 19px;
+      font-weight: 550;
+    }
+
+    ol {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    li {
+      padding: 10px 0;
+      border-top: 1px solid var(--ml-border);
+      color: var(--ml-muted);
+      font-size: 12px;
+
+      strong {
+        color: var(--ml-text);
+        font-weight: 550;
+      }
+    }
+
+    p {
+      margin: 18px 0;
+      color: var(--ml-text);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+  }
+
+  .squat-comparison,
+  .squat-notice {
+    margin: 15px 0 0;
+    color: var(--ml-muted);
+    font-size: 11px;
+    line-height: 1.5;
+
+    a {
+      color: var(--ml-accent-soft);
+    }
+  }
+}
+
+.sports-app .tracking-screen {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(270px, 0.85fr);
+  gap: 26px 42px;
+
+  .tracking-stage {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .squat-session {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0;
+    border-bottom: 0;
+  }
+
+  .measurement-panel,
+  .imu-angle-graphs,
+  .movement-debug-graphs,
+  > .secondary-button,
+  #individual-sensor-graphs {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 700px) {
+  .sports-app .tracking-screen {
+    grid-template-columns: 1fr;
+
+    .squat-session,
+    .tracking-stage,
+    .measurement-panel,
+    .imu-angle-graphs {
+      grid-column: 1;
+      grid-row: auto;
+    }
+
+    .squat-session {
+      border-bottom: 1px solid var(--ml-border);
+    }
+  }
+}

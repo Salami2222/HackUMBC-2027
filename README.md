@@ -1,6 +1,6 @@
 # Kinetiq
 
-Kinetiq uses SlimeVR's React frontend and its existing skeleton visualizer. The default **Tracking** tab displays the live skeleton from assigned physical trackers. It requires fresh tracker and bone feeds and shows a waiting state when tracking is unavailable; it has no simulated sessions, sample metrics, or form scoring. **Sensor Calibration** connects to the local tracking service for live body-node assignment, automatic mounting calibration, battery levels, and a live skeleton preview.
+Kinetiq uses SlimeVR's React frontend and its existing skeleton visualizer. The default **Tracking** tab displays the live skeleton from assigned physical trackers and offers a live squat warm-up and session. It requires fresh tracker and bone feeds and shows a waiting state when tracking is unavailable; it has no simulated tracking source or form scoring. **Sensor Calibration** connects to the local tracking service for live body-node assignment, automatic mounting calibration, battery levels, and a live skeleton preview.
 
 ## Run locally
 
@@ -44,11 +44,17 @@ Reference capture requires at least 20 samples spanning three seconds, with all 
 
 The Tracking page then shows unsigned left/right knee-bend estimates, their difference, and head-to-chest pitch/turn. These use calibrated physical tracker quaternions, relative segment rotations, and changes from the captured stance. Shared world heading cancels out. Knee bend is the angle between neutral and current segment up axes; pitch/turn use YXZ Euler decomposition, with near-singular readings withheld. Values are not clinical anatomical measurements, eye gaze, or a form score. Missing sensors suppress only measurements that depend on them; unavailable values stay blank with a reason.
 
-Measurement freshness requires a feed received within one second plus a positive backend packet rate and an OK tracker status. SolarXR does not provide a per-sample hardware timestamp here, so this cannot independently prove each sensor sample's age. Physical alignment, drift, and accuracy still require real tracker testing. Rep counting, squat phases, form rules, recording, and Jev integration are outside this milestone.
+Measurement freshness requires a feed received within one second plus a positive backend packet rate and an OK tracker status. SolarXR does not provide a per-sample hardware timestamp here, so this cannot independently prove each sensor sample's age. Physical alignment, drift, and accuracy still require real tracker testing.
+
+## Live squat warm-up
+
+After auto-orientation and upright reference capture, choose **Record Baseline** on Tracking. The live rep detector uses both knee-bend measurements, a five-sample median, and a return to upright to complete each rep. It requires a stable upright start, records both leg peaks, and checks the deepest simultaneous bend of the straighter leg. Separate one-leg bends cannot combine into acceptable bilateral depth. A data gap discards the partial rep and requires another upright start. At least 75° is acceptable; 60° to under 75° is shallow, and under 60° is very shallow. These are demo depth thresholds, not medical judgments.
+
+All three warm-up reps finish before validation. If all three have acceptable depth, their knee-flexion values are averaged into a personal baseline and saved to localStorage. If any rep is shallow or very shallow, the entire attempt is rejected and **Retry Warm-Up** starts a fresh three-rep attempt. A previously accepted baseline remains available after a failed replacement attempt. **Start Session** records live squat reps only when an accepted baseline and current upright reference are available. Recalibration is required after a refresh, but the accepted baseline persists.
 
 ## Checks
 
-Tracking keeps two movement-debugging graphs visible: head up/down and left/right upper-to-lower-leg bend. Head up/down is the change in the calibrated head forward-axis inclination relative to the floor (positive up, negative down). A dashed head/chest trace distinguishes neck motion from torso lean. Knee bend uses the existing unsigned, neutral-relative segment-angle estimate; its supplementary inner-angle estimate is `180 - bend` (straight reference = 180 degrees). Neither value is a validated form threshold or squat-depth score. The debug cards show current readings, ten-second minima/maxima, plotted sample counts, per-trace availability, reference status, ready-node count, and feed age. History uses actual feed arrival times, breaks across unavailable data or gaps over 500 ms, and clears when the reference changes. **Show sensor graphs / Hide sensor graphs** controls the individual IMU charts independently; their collection continues while hidden. No simulation or form classification is added.
+Tracking keeps two movement-debugging graphs visible: head up/down and left/right upper-to-lower-leg bend. Head up/down is the change in the calibrated head forward-axis inclination relative to the floor (positive up, negative down). A dashed head/chest trace distinguishes neck motion from torso lean. Knee bend uses the existing unsigned, neutral-relative segment-angle estimate; its supplementary inner-angle estimate is `180 - bend` (straight reference = 180 degrees). Neither value is a validated form threshold or squat-depth score. The debug cards show current readings, ten-second minima/maxima, plotted sample counts, per-trace availability, reference status, ready-node count, and feed age. History uses actual feed arrival times, breaks across unavailable data or gaps over 500 ms, and clears when the reference changes. **Show sensor graphs / Hide sensor graphs** controls the individual IMU charts independently; their collection continues while hidden. These charts show measurements independently of the demo squat-depth classifier.
 
 The Tracking page also plots each physical node's calibrated pitch, yaw, and roll in degrees over the last ten seconds. These are IMU orientations (YZX Euler convention), not joint angles or form scores. Missing/invalid rotations, offline nodes, and zero packet rates do not produce angle values. Readouts become unavailable after three seconds without a fresh sample. Graphs break at missing samples, gaps over half a second, and angle wrapping; calibration resets and reconnects clear their history. Samples stay in page memory only.
 
@@ -57,6 +63,7 @@ npm run typecheck
 npm run test:measurements
 npm run test:service
 npm run test:floor
+npm run test:squat
 npm run lint
 npm run build
 ```
@@ -68,11 +75,12 @@ The measurement test command requires Node.js 22.6 or newer and exercises quater
 - `src/components/sports/` contains the dashboard and styling.
 - `src/components/sports/LiveMovementDashboard.tsx` uses the existing SolarXR data feeds, body assignment/name RPC, and reset hook for physical trackers. `node-positions.ts` defines the ten supported positions and their segment mappings.
 - `src/measurement/` contains the shared live measurement engine, reference capture, data-quality gates, and provider. `MeasurementPanel.tsx` exposes setup and measurements on the two tabs.
+- `src/exercise/squat.ts` contains the buffered live rep detector, isolated depth validator, three-rep analysis, baseline calculation, and persistence helpers. `SquatSessionPanel.tsx` uses those results on Tracking.
 - `src/components/sports/NodeSetup.tsx` uses serial discovery and Wi-Fi provisioning RPCs. The password is visible and retained in page memory through setup, stopping, and tab switching; reloading the page clears it. `NodePicker.tsx` supplies the keyboard-accessible node selectors, including saved offline nodes.
 - `src/components/widgets/SkeletonVisualizerWidget.tsx` remains SlimeVR's renderer. Both tabs use the server-fed `bonesAtom` path. The Tracking page requires a connected service, an assigned online physical IMU, nonempty bones, and tracker and bone feeds received within the last three seconds. Missing segments are estimated by the tracking service.
 - `solarxr-protocol/` is the local protocol package used by the frontend. Its dependency path points within this repository.
 - Only `/#/` (Tracking) and `/#/calibration` (Sensor Calibration) are exposed; legacy dashboard, settings, and onboarding URLs redirect to Tracking.
 
-Kinetiq currently provides hardware setup, calibration, and live skeleton viewing. It does not detect reps or assess lifting form. Tracker orientation and inferred skeleton positions are not validated biomechanics measurements.
+Kinetiq currently provides hardware setup, calibration, live skeleton viewing, and demo squat-depth validation. It does not provide a validated lifting-form or injury assessment. Tracker orientation and inferred skeleton positions are not validated biomechanics measurements.
 
 This project reuses code from [SlimeVR Server](https://github.com/SlimeVR/SlimeVR-Server) at commit `83941fd38e91cc91ca6b360deab5c2ae986dd1b6`. Its MIT and Apache 2.0 licenses and trademark notice are included here. The separate SlimeVR Server checkout is not modified.
