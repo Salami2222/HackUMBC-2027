@@ -11,41 +11,29 @@ import { BodyPart, DataFeedMessage, DataFeedUpdateT } from 'solarxr-protocol';
 import { useMeasurements } from '@/measurement/MeasurementProvider';
 import { floorOffset } from '@/measurement/floor';
 import { useWebsocketAPI } from '@/hooks/websocket-api';
-import { SquatPhaseDetector, SESSION_REPS, PhaseSample } from './squat-phase';
+import { SquatPhaseDetector, PhaseSample } from './squat-phase';
 import { FormAnalyzer, FormRep, summarizeForm } from './form-quality';
 import { PhaseAdviser } from './phase-adviser';
 import { FormAdviser } from './form-adviser';
-import {
-  classifyHeadInclination,
-  analyzeWarmup,
-  completeSquatRep,
-  CompletedSquatRep,
-  createSquatBaseline,
-  loadSquatBaseline,
-  saveSquatBaseline,
-  SquatBaseline,
-  WarmupAnalysis,
-  WARMUP_REP_COUNT,
-} from './squat';
-type Phase = 'idle' | 'warmup' | 'training' | 'result';
+import { classifyHeadInclination, CompletedSquatRep } from './squat';
+import { FormTestRepResult, FormTestResult } from './form-test';
+import { recordFormTestRep, recordWorkingSetRep } from './session-recording';
+import { SessionMode, targetRepCount } from './session-config';
+
+type Phase = 'idle' | SessionMode;
+
 function useSessionState() {
   const measurementState = useMeasurements();
-  const [baseline, setBaseline] = useState<SquatBaseline | null>(() => {
-    try {
-      return typeof window === 'undefined'
-        ? null
-        : loadSquatBaseline(window.localStorage);
-    } catch {
-      return null;
-    }
-  });
+  const [sessionMode, setSelectedMode] = useState<SessionMode>('working-set');
   const [phase, setPhase] = useState<Phase>('idle');
   const phaseRef = useRef<Phase>('idle');
-  const [warmupReps, setWarmupReps] = useState<CompletedSquatRep[]>([]);
-  const warmupRepsRef = useRef<CompletedSquatRep[]>([]);
+  const [formTestReps, setFormTestReps] = useState<FormTestRepResult[]>([]);
+  const formTestRepsRef = useRef<FormTestRepResult[]>([]);
+  const [formTestResult, setFormTestResult] = useState<FormTestResult | null>(
+    null
+  );
   const [trainingReps, setTrainingReps] = useState<CompletedSquatRep[]>([]);
   const trainingRepsRef = useRef<CompletedSquatRep[]>([]);
-  const [result, setResult] = useState<WarmupAnalysis | null>(null);
   const [notice, setNotice] = useState('');
   const detector = useRef(new SquatPhaseDetector());
   const formAnalyzer = useRef(new FormAnalyzer());
@@ -92,6 +80,7 @@ function useSessionState() {
       };
     }
   );
+
   const resetMotion = (reason?: string) => {
     detector.current.reset(reason);
     formAnalyzer.current.reset();
@@ -110,12 +99,13 @@ function useSessionState() {
   );
   useEffect(() => {
     resetMotion();
-    if (phaseRef.current === 'warmup' || phaseRef.current === 'training') {
-      if (phaseRef.current === 'warmup') {
-        warmupRepsRef.current = [];
-        setWarmupReps([]);
+    if (phaseRef.current !== 'idle') {
+      if (phaseRef.current === 'form-test') {
+        formTestRepsRef.current = [];
+        setFormTestReps([]);
+      } else {
+        setEndedAt(Date.now());
       }
-      if (phaseRef.current === 'training') setEndedAt(Date.now());
       phaseRef.current = 'idle';
       setPhase('idle');
       setNotice('The upright reference changed. Recalibrate before recording.');
@@ -151,7 +141,7 @@ function useSessionState() {
     const peaks = detector.current.ingest(sample, adviser.current.advice);
     if (previous !== detector.current.state.phase) adviser.current.reset();
     setMotion({ ...detector.current.state });
-    if (phaseRef.current === 'training') {
+    if (phaseRef.current === 'working-set') {
       if (
         previous !== detector.current.state.phase &&
         ['descending', 'unavailable'].includes(detector.current.state.phase)
@@ -169,54 +159,26 @@ function useSessionState() {
           formAnalyzer.current.review(trainingRepsRef.current.length + 1)
         );
     }
-    // Only explicitly started sets request paid advice.
-    if (phaseRef.current === 'warmup' || phaseRef.current === 'training')
+    if (phaseRef.current !== 'idle')
       void adviser.current.request(
         samples.current,
         detector.current.state.phase
       );
-    if (phaseRef.current !== 'warmup' && phaseRef.current !== 'training')
-      return;
-    if (!peaks) return;
-    if (phaseRef.current === 'warmup') {
-      const next = [
-        ...warmupRepsRef.current,
-        completeSquatRep(
-          warmupRepsRef.current.length + 1,
-          peaks,
-          measurementState.sampleTime
-        ),
-      ];
-      warmupRepsRef.current = next;
-      setWarmupReps(next);
-      if (next.length === WARMUP_REP_COUNT) {
-        const analysis = analyzeWarmup(next);
-        phaseRef.current = 'result';
-        setPhase('result');
-        setResult(analysis);
+    if (!peaks || phaseRef.current === 'idle') return;
+
+    if (phaseRef.current === 'form-test') {
+      const recorded = recordFormTestRep(formTestRepsRef.current, peaks);
+      formTestRepsRef.current = recorded.reps;
+      setFormTestReps(recorded.reps);
+      if (recorded.result) {
+        phaseRef.current = 'idle';
+        setPhase('idle');
+        setFormTestResult(recorded.result);
         resetMotion();
-        if (analysis.accepted) {
-          const accepted = createSquatBaseline(
-            analysis,
-            measurementState.sampleTime
-          );
-          setBaseline(accepted);
-          try {
-            saveSquatBaseline(window.localStorage, accepted);
-          } catch {
-            setNotice('Baseline accepted, but this browser could not save it.');
-          }
-        }
       }
     } else {
-      const next = [
-        ...trainingRepsRef.current,
-        completeSquatRep(
-          trainingRepsRef.current.length + 1,
-          peaks,
-          measurementState.sampleTime
-        ),
-      ];
+      const recorded = recordWorkingSetRep(trainingRepsRef.current, peaks, at);
+      const next = recorded.reps;
       const completed = next.at(-1)!;
       const measured = formAnalyzer.current.finish(
         completed.rep,
@@ -227,7 +189,7 @@ function useSessionState() {
       setFormReps((previous) => [...previous, assessment]);
       trainingRepsRef.current = next;
       setTrainingReps(next);
-      if (next.length >= SESSION_REPS) {
+      if (recorded.complete) {
         phaseRef.current = 'idle';
         setPhase('idle');
         adviser.current.reset();
@@ -244,76 +206,64 @@ function useSessionState() {
     head,
   ]);
 
-  const startWarmup = () => {
-    if (!canMeasure) return;
-    resetMotion();
-    warmupRepsRef.current = [];
-    setWarmupReps([]);
-    setResult(null);
+  const selectSessionMode = (mode: SessionMode) => {
+    if (phaseRef.current !== 'idle') return;
+    setSelectedMode(mode);
     setNotice('');
-    phaseRef.current = 'warmup';
-    setPhase('warmup');
   };
 
-  const startPresentationSet = () => {
-    if (!canMeasure) return;
-    setFormReps([]);
-    setEndedAt(null);
+  const startSession = () => {
+    if (!canMeasure || phaseRef.current !== 'idle') return;
     resetMotion();
-    warmupRepsRef.current = [];
-    setWarmupReps([]);
-    trainingRepsRef.current = [];
-    setTrainingReps([]);
     setNotice('');
-    setResult(null);
-    phaseRef.current = 'training';
-    setPhase('training');
-  };
-
-  const startTraining = () => {
-    if (!baseline) return;
-    startPresentationSet();
+    if (sessionMode === 'form-test') {
+      formTestRepsRef.current = [];
+      setFormTestReps([]);
+      setFormTestResult(null);
+    } else {
+      setFormReps([]);
+      setEndedAt(null);
+      trainingRepsRef.current = [];
+      setTrainingReps([]);
+    }
+    phaseRef.current = sessionMode;
+    setPhase(sessionMode);
   };
 
   const stop = () => {
-    if (phaseRef.current === 'training') setEndedAt(Date.now());
+    if (phaseRef.current === 'idle') return;
+    if (phaseRef.current === 'working-set') setEndedAt(Date.now());
+    if (phaseRef.current === 'form-test') {
+      formTestRepsRef.current = [];
+      setFormTestReps([]);
+    }
     resetMotion();
     phaseRef.current = 'idle';
     setPhase('idle');
-    if (phase === 'warmup') {
-      warmupRepsRef.current = [];
-      setWarmupReps([]);
-    }
-  };
-
-  const dismissResult = () => {
-    phaseRef.current = 'idle';
-    setPhase('idle');
-    setResult(null);
   };
 
   return {
-    baseline,
+    sessionMode,
+    selectSessionMode,
+    targetRepCount: targetRepCount(sessionMode),
+    formTestReps,
+    formTestResult,
+    trainingReps,
     formReps,
     formSummary,
     endedAt,
     phase,
-    warmupReps,
-    trainingReps,
-    result,
     notice,
     canMeasure,
     head,
     headStatus,
     motion,
     jevStatus: adviser.current.status,
-    startWarmup,
-    startTraining,
-    startPresentationSet,
+    startSession,
     stop,
-    dismissResult,
   };
 }
+
 const SessionContext = createContext<ReturnType<typeof useSessionState> | null>(
   null
 );

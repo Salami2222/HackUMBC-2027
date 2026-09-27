@@ -1,0 +1,30 @@
+.sports-app .session-mode-select {
+  display: grid;
+  gap: 6px;
+  width: min(100%, 240px);
+  margin-bottom: 18px;
+
+  span {
+    color: #c1b4dd;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  select {
+    width: 100%;
+    padding: 8px 30px 8px 10px;
+    border: 1px solid #67537f;
+    border-radius: 6px;
+    color: #f2eaff;
+    background: #242033;
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  select:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+}

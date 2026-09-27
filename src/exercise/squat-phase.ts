@@ -39,7 +39,6 @@ export const PHASE_LABELS: Record<SquatPhase, string> = {
   bottom: 'Bottom',
   ascending: 'Ascending',
 };
-export const SESSION_REPS = 8;
 export const PHASE_MAX_GAP_MS = 500;
 const median = (values: number[]) =>
   [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];

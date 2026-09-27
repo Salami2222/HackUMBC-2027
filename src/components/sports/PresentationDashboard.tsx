@@ -16,7 +16,10 @@ import { useMeasurements } from '@/measurement/MeasurementProvider';
 import { useSquatSession } from '@/exercise/SquatSessionProvider';
 import { FORM_LABELS } from '@/exercise/form-quality';
 import { SetFeedback } from './SetFeedback';
-import { PHASE_LABELS, SESSION_REPS } from '@/exercise/squat-phase';
+import { PHASE_LABELS } from '@/exercise/squat-phase';
+import { WORKING_SET_REP_COUNT } from '@/exercise/session-config';
+import { FormTestSummary, formTestDepthLabel } from './FormTestSummary';
+import { SessionModeSelect } from './SessionModeSelect';
 import {
   SkeletonPreviewView,
   SkeletonVisualizerWidget,
@@ -29,34 +32,54 @@ import './PresentationDashboard.scss';
 const PHASES = ['ready', 'descending', 'bottom', 'ascending'] as const;
 export const PresentationPerformance = memo(function PresentationPerformance() {
   const session = useSquatSession();
-  const { motion, phase, trainingReps, canMeasure } = session;
-  const count = trainingReps.length;
-  const complete = count === SESSION_REPS && phase === 'idle';
+  const {
+    motion,
+    phase,
+    sessionMode,
+    targetRepCount,
+    trainingReps,
+    formTestReps,
+    formTestResult,
+    canMeasure,
+  } = session;
+  const count =
+    sessionMode === 'form-test' ? formTestReps.length : trainingReps.length;
+  const complete =
+    sessionMode === 'form-test'
+      ? !!formTestResult
+      : count === WORKING_SET_REP_COUNT && phase === 'idle';
   const current = canMeasure && !complete ? motion.phase : 'unavailable';
   const label = complete
-    ? 'Set complete'
+    ? sessionMode === 'form-test'
+      ? 'Test complete'
+      : 'Set complete'
     : !canMeasure
       ? 'No tracking'
       : PHASE_LABELS[current];
-  const active = phase === 'training';
+  const active = phase !== 'idle';
   return (
     <aside
       className="presentation-performance"
       aria-label="Session performance"
+      data-mode={sessionMode}
     >
       <div className="presentation-reps">
+        <SessionModeSelect
+          id="presentation-session-type"
+          className="presentation-session-mode"
+        />
         <div className="presentation-stat-heading">
-          Session
+          {sessionMode === 'form-test' ? 'Form Test' : 'Working Set'}
           <button
             className="presentation-session-button"
             disabled={!active && !canMeasure}
-            onClick={active ? session.stop : session.startPresentationSet}
+            onClick={active ? session.stop : session.startSession}
           >
-            {active ? 'Stop' : 'Start set'}
+            {active ? 'Stop' : 'Start Session'}
           </button>
         </div>
         <div className="presentation-rep-count">
-          {String(count).padStart(2, '0')} <span>/ {SESSION_REPS}</span>
+          {String(count).padStart(2, '0')} <span>/ {targetRepCount}</span>
         </div>
         <div className="presentation-rep-label">Reps</div>
         <p className="presentation-session-status" role="status">
@@ -65,142 +88,185 @@ export const PresentationPerformance = memo(function PresentationPerformance() {
               ? 'Recording'
               : 'Tracking paused'
             : complete
-              ? 'Eight reps recorded'
-              : 'Start a set to count reps'}
+              ? sessionMode === 'form-test'
+                ? 'Three reps recorded'
+                : 'Eight reps recorded'
+              : sessionMode === 'form-test'
+                ? 'Start a test to count reps'
+                : 'Start a set to count reps'}
         </p>
       </div>
-      <div className="presentation-phase">
-        <p className="presentation-eyebrow">Squat phase</p>
-        <div
-          className="presentation-phase-value"
-          data-phase={current}
-          data-paused={motion.paused}
-          role="status"
-          aria-live="polite"
-        >
-          <span className="presentation-phase-arrow" aria-hidden="true">
-            {current === 'descending'
-              ? '↓'
-              : current === 'ascending'
-                ? '↑'
-                : current === 'bottom'
-                  ? '↕'
-                  : complete
-                    ? '✓'
-                    : '—'}
-          </span>
-          <strong
-            key={`${current}:${complete}`}
-            className="presentation-phase-word"
+      {!(sessionMode === 'form-test' && formTestResult) && (
+        <div className="presentation-phase">
+          <p className="presentation-eyebrow">Squat phase</p>
+          <div
+            className="presentation-phase-value"
+            data-phase={current}
+            data-paused={motion.paused}
+            role="status"
+            aria-live="polite"
           >
-            {label}
-          </strong>
-        </div>
-        <ol className="presentation-phase-track" aria-label="Squat phase">
-          {PHASES.map((item) => (
-            <li
-              key={item}
-              data-current={item === current}
-              aria-current={item === current ? 'step' : undefined}
+            <span className="presentation-phase-arrow" aria-hidden="true">
+              {current === 'descending'
+                ? '↓'
+                : current === 'ascending'
+                  ? '↑'
+                  : current === 'bottom'
+                    ? '↕'
+                    : complete
+                      ? '✓'
+                      : '—'}
+            </span>
+            <strong
+              key={`${current}:${complete}`}
+              className="presentation-phase-word"
             >
-              <span aria-hidden="true" />
-              {PHASE_LABELS[item]}
-            </li>
-          ))}
-        </ol>
-      </div>
-      <section
-        className="presentation-form"
-        aria-label="Form across eight reps"
-      >
-        <div className="form-chart-heading">
-          <p className="presentation-eyebrow">Measured form</p>
-          <SetFeedback />
+              {label}
+            </strong>
+          </div>
+          <ol className="presentation-phase-track" aria-label="Squat phase">
+            {PHASES.map((item) => (
+              <li
+                key={item}
+                data-current={item === current}
+                aria-current={item === current ? 'step' : undefined}
+              >
+                <span aria-hidden="true" />
+                {PHASE_LABELS[item]}
+              </li>
+            ))}
+          </ol>
         </div>
-        <div
-          className="presentation-form-chart"
-          role="img"
-          aria-label="Form graph with eight rep divisions and Optimal, Sub-optimal and Needs attention bands. Completed rep scores cover measured movement only."
+      )}
+      {sessionMode === 'form-test' ? (
+        <section
+          className="presentation-form presentation-form-test"
+          aria-label="Form Test depth"
         >
-          <div className="presentation-form-plot" aria-hidden="true">
-            <div className="presentation-form-band is-optimal">
-              <span>Optimal</span>
+          {formTestResult ? (
+            <FormTestSummary
+              result={formTestResult}
+              onRunAgain={session.startSession}
+              canMeasure={canMeasure}
+            />
+          ) : (
+            <>
+              <p className="presentation-eyebrow">Squat depth · 75° target</p>
+              <p>Complete three squats to see your depth result.</p>
+              <ol className="presentation-form-test-reps">
+                {Array.from({ length: targetRepCount }, (_, index) => {
+                  const rep = formTestReps[index];
+                  return (
+                    <li key={index}>
+                      <span>Rep {index + 1}</span>
+                      <strong>
+                        {rep
+                          ? formTestDepthLabel(rep.depthClassification)
+                          : '—'}
+                      </strong>
+                    </li>
+                  );
+                })}
+              </ol>
+            </>
+          )}
+        </section>
+      ) : (
+        <section
+          className="presentation-form"
+          aria-label="Form across eight reps"
+        >
+          <div className="form-chart-heading">
+            <p className="presentation-eyebrow">Measured form</p>
+            <SetFeedback />
+          </div>
+          <div
+            className="presentation-form-chart"
+            role="img"
+            aria-label="Form graph with eight rep divisions and Optimal, Sub-optimal and Needs attention bands. Completed rep scores cover measured movement only."
+          >
+            <div className="presentation-form-plot" aria-hidden="true">
+              <div className="presentation-form-band is-optimal">
+                <span>Optimal</span>
+              </div>
+              <div className="presentation-form-band is-suboptimal">
+                <span>Sub-optimal</span>
+              </div>
+              <div className="presentation-form-band is-attention">
+                <span>Needs attention</span>
+              </div>
+              <svg
+                className="form-score-trace"
+                viewBox="0 0 800 300"
+                preserveAspectRatio="none"
+                aria-label="Completed rep scores"
+              >
+                {session.formReps.map((rep, i, all) => {
+                  // The vertical bands are categories, not a linear numeric axis.
+                  // Within each band, the unmodified weighted score sets the height.
+                  const y = (score: number, rating: string) =>
+                    (rating === 'optimal'
+                      ? 0
+                      : rating === 'suboptimal'
+                        ? 100
+                        : 200) +
+                    32 +
+                    (100 - score) * 0.6;
+                  const x = 50 + i * 100;
+                  const previous = all[i - 1];
+                  return (
+                    <g key={rep.rep}>
+                      {rep.score != null && previous?.score != null && (
+                        <line
+                          x1={x - 100}
+                          y1={y(previous.score, previous.rating)}
+                          x2={x}
+                          y2={y(rep.score, rep.rating)}
+                        />
+                      )}
+                      {rep.score != null ? (
+                        <circle
+                          cx={x}
+                          cy={Math.max(
+                            8,
+                            Math.min(292, y(rep.score, rep.rating))
+                          )}
+                          r="5"
+                          data-rating={rep.rating}
+                        >
+                          <title>
+                            Rep {rep.rep}: {FORM_LABELS[rep.rating]},{' '}
+                            {rep.score}
+                            /100; {Math.round(rep.coverage * 100)}% data
+                            coverage
+                          </title>
+                        </circle>
+                      ) : (
+                        <text x={x} y="282" textAnchor="middle">
+                          ?<title>Rep {rep.rep}: insufficient data</title>
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+              </svg>
+              <div className="presentation-rep-grid">
+                {Array.from({ length: 8 }, (_, i) => (
+                  <span key={i} />
+                ))}
+              </div>
             </div>
-            <div className="presentation-form-band is-suboptimal">
-              <span>Sub-optimal</span>
-            </div>
-            <div className="presentation-form-band is-attention">
-              <span>Needs attention</span>
-            </div>
-            <svg
-              className="form-score-trace"
-              viewBox="0 0 800 300"
-              preserveAspectRatio="none"
-              aria-label="Completed rep scores"
-            >
-              {session.formReps.map((rep, i, all) => {
-                // The vertical bands are categories, not a linear numeric axis.
-                // Within each band, the unmodified weighted score sets the height.
-                const y = (score: number, rating: string) =>
-                  (rating === 'optimal'
-                    ? 0
-                    : rating === 'suboptimal'
-                      ? 100
-                      : 200) +
-                  32 +
-                  (100 - score) * 0.6;
-                const x = 50 + i * 100;
-                const previous = all[i - 1];
-                return (
-                  <g key={rep.rep}>
-                    {rep.score != null && previous?.score != null && (
-                      <line
-                        x1={x - 100}
-                        y1={y(previous.score, previous.rating)}
-                        x2={x}
-                        y2={y(rep.score, rep.rating)}
-                      />
-                    )}
-                    {rep.score != null ? (
-                      <circle
-                        cx={x}
-                        cy={Math.max(
-                          8,
-                          Math.min(292, y(rep.score, rep.rating))
-                        )}
-                        r="5"
-                        data-rating={rep.rating}
-                      >
-                        <title>
-                          Rep {rep.rep}: {FORM_LABELS[rep.rating]}, {rep.score}
-                          /100; {Math.round(rep.coverage * 100)}% data coverage
-                        </title>
-                      </circle>
-                    ) : (
-                      <text x={x} y="282" textAnchor="middle">
-                        ?<title>Rep {rep.rep}: insufficient data</title>
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
-            </svg>
-            <div className="presentation-rep-grid">
+            <div className="presentation-rep-axis" aria-hidden="true">
               {Array.from({ length: 8 }, (_, i) => (
-                <span key={i} />
+                <span key={i}>{i + 1}</span>
               ))}
             </div>
+            <span className="presentation-axis-title" aria-hidden="true">
+              Rep
+            </span>
           </div>
-          <div className="presentation-rep-axis" aria-hidden="true">
-            {Array.from({ length: 8 }, (_, i) => (
-              <span key={i}>{i + 1}</span>
-            ))}
-          </div>
-          <span className="presentation-axis-title" aria-hidden="true">
-            Rep
-          </span>
-        </div>
-      </section>
+        </section>
+      )}
     </aside>
   );
 });
@@ -259,7 +325,7 @@ export function PresentationDashboard({
     measurements.oriented &&
     !measurements.capturing &&
     !reset.disabled;
-  const active = session.phase === 'training';
+  const active = session.phase !== 'idle';
   const actions = (
     <div className="presentation-actions">
       <span className={`presentation-feed-state ${live ? 'is-live' : ''}`}>
@@ -285,12 +351,13 @@ export function PresentationDashboard({
         <div className="presentation-menu-content">
           <button
             disabled={!session.canMeasure || active}
-            onClick={session.startPresentationSet}
+            onClick={session.startSession}
           >
-            Start eight-rep set
+            Start{' '}
+            {session.sessionMode === 'form-test' ? 'Form Test' : 'Working Set'}
           </button>
           <button disabled={!active} onClick={session.stop}>
-            Stop set
+            Stop session
           </button>
           <p>{session.jevStatus}</p>
           {session.notice && <p role="status">{session.notice}</p>}
