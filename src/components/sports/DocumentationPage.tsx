@@ -197,10 +197,11 @@ export function DocumentationPage() {
         <p className="docs-note">
           Inward deviation assumes SlimeVR’s calibrated segment axes match your
           legs. Mounting errors and tracker drift can mix forward bending into
-          this estimate. Check both traces on Tracking against your movement
-          after calibration. The 8°, 18° and 20° limits are experimental testing
-          settings, not established safety limits. Equal inward movement of both
-          knees can trigger this factor even when knee symmetry is good.
+          this estimate. After calibration, check both traces against your
+          movement in Tracking diagnostics, available from Presentation’s …
+          menu. The 8°, 18° and 20° limits are experimental testing settings,
+          not established safety limits. Equal inward movement of both knees can
+          trigger this factor even when knee symmetry is good.
         </p>
         <div className="docs-ratings">
           <article className="docs-optimal">

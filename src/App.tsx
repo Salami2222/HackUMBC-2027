@@ -41,11 +41,15 @@ function AppSurface() {
   const [presentationActions, setPresentationActions] =
     useState<HTMLDivElement | null>(null);
   if (
-    !['/', '/calibration', '/presentation', '/feedback', '/docs'].includes(
-      pathname
-    )
+    ![
+      '/tracking',
+      '/calibration',
+      '/presentation',
+      '/feedback',
+      '/docs',
+    ].includes(pathname)
   )
-    return <Navigate to="/" replace />;
+    return <Navigate to="/presentation" replace />;
 
   return (
     <div className="sports-app">
@@ -82,9 +86,6 @@ function AppSurface() {
           </NavLink>
         </div>
         <nav className="sports-nav" aria-label="Main navigation">
-          <NavLink to="/" end>
-            Tracking
-          </NavLink>
           <NavLink to="/calibration">Sensor Calibration</NavLink>
           <NavLink to="/presentation">Presentation</NavLink>
           <NavLink to="/feedback">Feedback</NavLink>
@@ -96,8 +97,8 @@ function AppSurface() {
         />
       </header>
       {groundingError && <p role="alert">{groundingError}</p>}
-      <div hidden={pathname !== '/'}>
-        <SportsDashboard active={pathname === '/'} />
+      <div hidden={pathname !== '/tracking'}>
+        <SportsDashboard active={pathname === '/tracking'} />
       </div>
       <div hidden={pathname !== '/calibration'}>
         <LiveMovementDashboard active={pathname === '/calibration'} />

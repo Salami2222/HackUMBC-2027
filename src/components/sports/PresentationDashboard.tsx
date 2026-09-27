@@ -410,6 +410,7 @@ export function PresentationDashboard({
           )}
           <p role="status">{resetMessage || measurements.message}</p>
           <Link to="/calibration">Sensor setup</Link>
+          <Link to="/tracking">Tracking diagnostics</Link>
         </div>
       </details>
     </div>
