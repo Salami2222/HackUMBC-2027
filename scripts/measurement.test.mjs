@@ -125,8 +125,14 @@ test('three-dimensional knee bend is independent of shared world heading', () =>
   assert.ok(Math.abs(metric(state, 'rightKnee').value) < 1e-5);
   assert.ok(Math.abs(metric(state, 'kneeDifference').value - 60) < 1e-5);
   assert.ok(Math.abs(metric(state, 'headPitch').value) < 1e-5);
-  assert.equal(state.roles.some((r) => r.part === BodyPart.HIP), false);
-  assert.equal(state.measurements.some((m) => m.id === 'chestHip'), false);
+  assert.equal(
+    state.roles.some((r) => r.part === BodyPart.HIP),
+    false
+  );
+  assert.equal(
+    state.measurements.some((m) => m.id === 'chestHip'),
+    false
+  );
 });
 
 test('relative rotations subtract the neutral relationship, not Euler components', () => {
@@ -229,4 +235,31 @@ test('near-singular relative pitch is unavailable rather than an unstable headin
   setRotation(node(list, BodyPart.HEAD), rotation([1, 0, 0], 90));
   engine.ingest(list, 4200);
   assert.equal(metric(engine.state(4200), 'headTurn').value, null);
+});
+
+test('head inclination tracks signed nodding independent of heading and chest lean', () => {
+  const { engine, list } = referenced();
+  for (const pitch of [-30, 25]) {
+    setRotation(
+      node(list, BodyPart.HEAD),
+      rotation([0, 1, 0], 70).multiply(rotation([1, 0, 0], pitch))
+    );
+    engine.ingest(list, 4200);
+    assert.ok(
+      Math.abs(metric(engine.state(4200), 'headInclination').value - pitch) <
+        1e-5
+    );
+  }
+  setRotation(node(list, BodyPart.HEAD), new Quaternion());
+  setRotation(node(list, BodyPart.CHEST), rotation([1, 0, 0], -35));
+  engine.ingest(list, 4300);
+  assert.ok(
+    Math.abs(metric(engine.state(4300), 'headInclination').value) < 1e-5
+  );
+  assert.ok(
+    Math.abs(metric(engine.state(4300), 'headPitch').value - 35) < 1e-5
+  );
+  node(list, BodyPart.HEAD).status = TrackerStatus.DISCONNECTED;
+  engine.ingest(list, 4400);
+  assert.equal(metric(engine.state(4400), 'headInclination').value, null);
 });

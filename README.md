@@ -48,6 +48,8 @@ Measurement freshness requires a feed received within one second plus a positive
 
 ## Checks
 
+Tracking keeps two movement-debugging graphs visible: head up/down and left/right upper-to-lower-leg bend. Head up/down is the change in the calibrated head forward-axis inclination relative to the floor (positive up, negative down). A dashed head/chest trace distinguishes neck motion from torso lean. Knee bend uses the existing unsigned, neutral-relative segment-angle estimate; its supplementary inner-angle estimate is `180 - bend` (straight reference = 180 degrees). Neither value is a validated form threshold or squat-depth score. The debug cards show current readings, ten-second minima/maxima, plotted sample counts, per-trace availability, reference status, ready-node count, and feed age. History uses actual feed arrival times, breaks across unavailable data or gaps over 500 ms, and clears when the reference changes. **Show sensor graphs / Hide sensor graphs** controls the individual IMU charts independently; their collection continues while hidden. No simulation or form classification is added.
+
 The Tracking page also plots each physical node's calibrated pitch, yaw, and roll in degrees over the last ten seconds. These are IMU orientations (YZX Euler convention), not joint angles or form scores. Missing/invalid rotations, offline nodes, and zero packet rates do not produce angle values. Readouts become unavailable after three seconds without a fresh sample. Graphs break at missing samples, gaps over half a second, and angle wrapping; calibration resets and reconnects clear their history. Samples stay in page memory only.
 
 ```sh

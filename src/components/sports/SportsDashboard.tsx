@@ -17,6 +17,7 @@ import {
 import './SportsDashboard.scss';
 import { ImuAngleGraphs } from './ImuAngleGraphs';
 import { MeasurementPanel } from './MeasurementPanel';
+import { MovementDebugGraphs } from './MovementDebugGraphs';
 
 export function SportsDashboard({ active = true }: { active?: boolean }) {
   const { isConnected, useDataFeedPacket } = useWebsocketAPI();
@@ -25,6 +26,7 @@ export function SportsDashboard({ active = true }: { active?: boolean }) {
   const received = useRef({ trackers: 0, bones: 0 });
   const view = useRef<SkeletonPreviewView | null>(null);
   const [now, setNow] = useState(Date.now);
+  const [showSensorGraphs, setShowSensorGraphs] = useState(false);
 
   useDataFeedPacket(
     DataFeedMessage.DataFeedUpdate,
@@ -124,8 +126,19 @@ export function SportsDashboard({ active = true }: { active?: boolean }) {
           </div>
         </div>
       </section>
+      <MovementDebugGraphs />
       <MeasurementPanel />
-      <ImuAngleGraphs />
+      <button
+        className="secondary-button"
+        aria-expanded={showSensorGraphs}
+        aria-controls="individual-sensor-graphs"
+        onClick={() => setShowSensorGraphs(!showSensorGraphs)}
+      >
+        {showSensorGraphs ? 'Hide sensor graphs' : 'Show sensor graphs'}
+      </button>
+      <div id="individual-sensor-graphs" hidden={!showSensorGraphs}>
+        <ImuAngleGraphs />
+      </div>
     </main>
   );
 }

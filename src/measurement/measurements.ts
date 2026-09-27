@@ -34,6 +34,8 @@ export interface Reference {
   capturedAt: number;
 }
 export interface MeasurementState {
+  sampleTime: number;
+  referenceCapturedAt: number | null;
   roles: RoleReading[];
   coreReady: boolean;
   oriented: boolean;
@@ -194,6 +196,25 @@ export function measure(
   );
   const left = result[0],
     right = result[1];
+  const head = roles.find((role) => role.part === BodyPart.HEAD)!;
+  const neutralHead = reference?.rotations.get(BodyPart.HEAD);
+  const inclination = (q: Quaternion) => {
+    const forward = new Vector3(0, 0, -1).applyQuaternion(q);
+    return Math.atan2(forward.y, Math.hypot(forward.x, forward.z)) * DEGREES;
+  };
+  result.push({
+    id: 'headInclination',
+    label: 'Head up / down',
+    value:
+      head.rotation && neutralHead && !head.reason
+        ? inclination(head.rotation) - inclination(neutralHead)
+        : null,
+    reason: head.reason
+      ? `Head: ${head.reason}`
+      : !neutralHead
+        ? 'Capture an upright reference'
+        : null,
+  });
   result.push({
     id: 'kneeDifference',
     label: 'Knee bend difference',
@@ -347,6 +368,8 @@ export class MeasurementEngine {
     const reference =
       this.reference?.signature === this.signature ? this.reference : null;
     return {
+      sampleTime: this.receivedAt,
+      referenceCapturedAt: reference?.capturedAt ?? null,
       roles,
       coreReady: roles.every((role) => !role.reason),
       oriented: this.orientedSignature === this.signature,

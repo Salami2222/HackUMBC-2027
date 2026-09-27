@@ -30,7 +30,7 @@
     "preview:electron": "electron-vite preview --config electron.vite.config.ts",
     "skipbundler": "vite build",
     "typecheck": "tsc --noEmit",
-    "test:measurements": "node --experimental-strip-types --test scripts/measurement.test.mjs",
+    "test:measurements": "node --experimental-strip-types --test scripts/measurement.test.mjs scripts/angle-history.test.mjs",
     "test:service": "node --test scripts/tracking-service.test.mjs",
     "test:floor": "node --experimental-strip-types --test scripts/floor.test.mjs",
     "lint": "tsc --noEmit && eslint --max-warnings=0 \"{electron,src}/**/*.{js,jsx,ts,tsx,json}\" && prettier --check \"{electron,src}/**/*.{js,jsx,ts,tsx,css,scss,md,json}\"",
