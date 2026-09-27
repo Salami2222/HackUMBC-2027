@@ -36,7 +36,7 @@ export function useReset(
 
   const serverGuards = useAtomValue(serverGuardsAtom);
   const { currentLocales } = useLocaleConfig();
-  const { sendRPCPacket, useRPCPacket } = useWebsocketAPI();
+  const { isConnected, sendRPCPacket, useRPCPacket } = useWebsocketAPI();
   const finishedTimeoutRef = useRef<NodeJS.Timeout>();
   const [status, setStatus] = useState<ResetBtnStatus>('idle');
   const [progress, setProgress] = useState(0);
@@ -69,6 +69,10 @@ export function useReset(
   };
 
   useEffect(() => {
+    if (!isConnected && status === 'counting') onResetCanceled();
+  }, [isConnected, status]);
+
+  useEffect(() => {
     if (status === 'finished') {
       finishedTimeoutRef.current = setTimeout(() => {
         setStatus('idle'); // only do that if we were on finished status. Allows to reset the outlined border
@@ -94,7 +98,7 @@ export function useReset(
         (resetType == ResetType.Mounting &&
           JSON.stringify(parts) !== JSON.stringify(bodyParts))
       ) {
-        onResetCanceled();
+        // A response for another reset control is not a failure of this one.
         return;
       }
       onResetProgress(progress, duration);

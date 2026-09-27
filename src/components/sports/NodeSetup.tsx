@@ -26,7 +26,7 @@ const statusMessages: Record<WifiProvisioningStatus, string> = {
   [WifiProvisioningStatus.LOOKING_FOR_SERVER]:
     'Wi-Fi connected. Looking for MotionLab…',
   [WifiProvisioningStatus.DONE]:
-    'Node connected. You can unplug USB, or plug in the next node.',
+    'Wi-Fi setup completed. This does not indicate current tracking status. Select the node marked Online and save its body position to see live movement. Keep it powered on after unplugging USB.',
   [WifiProvisioningStatus.CONNECTION_ERROR]:
     'Could not join Wi-Fi. Check the network name, password, and 2.4 GHz setting. Stop setup to edit and retry.',
   [WifiProvisioningStatus.COULD_NOT_FIND_SERVER]:
