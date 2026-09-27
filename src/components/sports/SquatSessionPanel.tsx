@@ -1,25 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { SetFeedback } from './SetFeedback';
 import { Link } from 'react-router-dom';
-import { useMeasurements } from '@/measurement/MeasurementProvider';
+import { useSquatSession } from '@/exercise/SquatSessionProvider';
+import { PHASE_LABELS } from '@/exercise/squat-phase';
 import {
   ACCEPTABLE_DEPTH_MIN_DEG,
   HEAD_INCLINATION_LIMIT_DEG,
   HEAD_INCLINATION_LABELS,
-  classifyHeadInclination,
-  analyzeWarmup,
-  completeSquatRep,
   CompletedSquatRep,
-  createSquatBaseline,
-  loadSquatBaseline,
-  saveSquatBaseline,
-  SquatBaseline,
-  SquatRepDetector,
-  WarmupAnalysis,
   WARMUP_REP_COUNT,
 } from '@/exercise/squat';
-
-type Phase = 'idle' | 'warmup' | 'training' | 'result';
-
 function depthLabel(classification: CompletedSquatRep['depthClassification']) {
   if (classification === 'acceptable') return 'Acceptable depth';
   if (classification === 'shallow') return 'Shallow';
@@ -27,152 +16,23 @@ function depthLabel(classification: CompletedSquatRep['depthClassification']) {
 }
 
 export function SquatSessionPanel() {
-  const measurementState = useMeasurements();
-  const [baseline, setBaseline] = useState<SquatBaseline | null>(() => {
-    try {
-      return typeof window === 'undefined'
-        ? null
-        : loadSquatBaseline(window.localStorage);
-    } catch {
-      return null;
-    }
-  });
-  const [phase, setPhase] = useState<Phase>('idle');
-  const phaseRef = useRef<Phase>('idle');
-  const [warmupReps, setWarmupReps] = useState<CompletedSquatRep[]>([]);
-  const warmupRepsRef = useRef<CompletedSquatRep[]>([]);
-  const [trainingReps, setTrainingReps] = useState<CompletedSquatRep[]>([]);
-  const trainingRepsRef = useRef<CompletedSquatRep[]>([]);
-  const [result, setResult] = useState<WarmupAnalysis | null>(null);
-  const [notice, setNotice] = useState('');
-  const detector = useRef(new SquatRepDetector());
-  const left = measurementState.measurements.find(
-    (measurement) => measurement.id === 'leftKnee'
-  )?.value;
-  const right = measurementState.measurements.find(
-    (measurement) => measurement.id === 'rightKnee'
-  )?.value;
-  const canMeasure =
-    measurementState.referenceReady &&
-    typeof left === 'number' &&
-    Number.isFinite(left) &&
-    typeof right === 'number' &&
-    Number.isFinite(right);
-  const head = measurementState.measurements.find(
-    (measurement) => measurement.id === 'headInclination'
-  )?.value;
-  const headStatus = classifyHeadInclination(
-    measurementState.referenceReady ? head : null
-  );
-
-  useEffect(() => {
-    if (measurementState.referenceReady) return;
-    detector.current.reset();
-    if (phaseRef.current === 'warmup' || phaseRef.current === 'training') {
-      if (phaseRef.current === 'warmup') {
-        warmupRepsRef.current = [];
-        setWarmupReps([]);
-      }
-      phaseRef.current = 'idle';
-      setPhase('idle');
-      setNotice('The upright reference changed. Recalibrate before recording.');
-    }
-  }, [measurementState.referenceReady]);
-
-  useEffect(() => {
-    if (phaseRef.current !== 'warmup' && phaseRef.current !== 'training')
-      return;
-    if (!canMeasure) {
-      detector.current.reset();
-      return;
-    }
-    const peaks = detector.current.ingest(
-      left,
-      right,
-      measurementState.sampleTime
-    );
-    if (!peaks) return;
-    if (phaseRef.current === 'warmup') {
-      const next = [
-        ...warmupRepsRef.current,
-        completeSquatRep(
-          warmupRepsRef.current.length + 1,
-          peaks,
-          measurementState.sampleTime
-        ),
-      ];
-      warmupRepsRef.current = next;
-      setWarmupReps(next);
-      if (next.length === WARMUP_REP_COUNT) {
-        const analysis = analyzeWarmup(next);
-        phaseRef.current = 'result';
-        setPhase('result');
-        setResult(analysis);
-        detector.current.reset();
-        if (analysis.accepted) {
-          const accepted = createSquatBaseline(
-            analysis,
-            measurementState.sampleTime
-          );
-          setBaseline(accepted);
-          try {
-            saveSquatBaseline(window.localStorage, accepted);
-          } catch {
-            setNotice('Baseline accepted, but this browser could not save it.');
-          }
-        }
-      }
-    } else {
-      const next = [
-        ...trainingRepsRef.current,
-        completeSquatRep(
-          trainingRepsRef.current.length + 1,
-          peaks,
-          measurementState.sampleTime
-        ),
-      ];
-      trainingRepsRef.current = next;
-      setTrainingReps(next);
-    }
-  }, [measurementState.sampleTime, canMeasure, left, right]);
-
-  const startWarmup = () => {
-    if (!canMeasure) return;
-    detector.current.reset();
-    warmupRepsRef.current = [];
-    setWarmupReps([]);
-    setResult(null);
-    setNotice('');
-    phaseRef.current = 'warmup';
-    setPhase('warmup');
-  };
-
-  const startTraining = () => {
-    if (!baseline || !canMeasure) return;
-    detector.current.reset();
-    trainingRepsRef.current = [];
-    setTrainingReps([]);
-    setNotice('');
-    phaseRef.current = 'training';
-    setPhase('training');
-  };
-
-  const stop = () => {
-    detector.current.reset();
-    phaseRef.current = 'idle';
-    setPhase('idle');
-    if (phase === 'warmup') {
-      warmupRepsRef.current = [];
-      setWarmupReps([]);
-    }
-  };
-
-  const dismissResult = () => {
-    phaseRef.current = 'idle';
-    setPhase('idle');
-    setResult(null);
-  };
-
+  const {
+    baseline,
+    phase,
+    warmupReps,
+    trainingReps,
+    result,
+    notice,
+    canMeasure,
+    head,
+    headStatus,
+    motion,
+    jevStatus,
+    startWarmup,
+    startTraining,
+    stop,
+    dismissResult,
+  } = useSquatSession();
   const latestTrainingRep = trainingReps.at(-1);
   const status =
     phase === 'warmup'
@@ -297,6 +157,23 @@ export function SquatSessionPanel() {
         </>
       )}
 
+      <p className="squat-notice" role="status">
+        {canMeasure ? PHASE_LABELS[motion.phase] : 'Tracking unavailable'}
+        {motion.paused ? ' · Paused' : ''}
+      </p>
+      <details className="squat-notice">
+        <summary>Phase diagnostics</summary>
+        <p>
+          Knee speed: {canMeasure ? `${motion.kneeSpeed.toFixed(1)}°/s` : '—'} ·
+          Head speed:{' '}
+          {canMeasure && motion.headSpeed != null
+            ? `${motion.headSpeed.toFixed(2)} m/s`
+            : '—'}
+        </p>
+        <p>{jevStatus}</p>
+        <p>{motion.reason}</p>
+      </details>
+      <SetFeedback />
       {notice && (
         <p className="squat-notice" role="status">
           {notice}
@@ -319,7 +196,7 @@ export function SquatSessionPanel() {
       )}
       {!canMeasure && (
         <p className="squat-notice">
-          <Link to="/calibration">Calibrate six measurement nodes</Link> and
+          <Link to="/calibration">Calibrate eight measurement nodes</Link> and
           capture an upright reference before recording live reps.
         </p>
       )}

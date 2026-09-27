@@ -16,14 +16,14 @@ export const NODE_POSITIONS = [
     hint: 'Place on your right upper arm, just above the elbow.',
   },
   {
-    part: BodyPart.LEFT_LOWER_ARM,
-    label: 'Left hand / wrist',
-    hint: 'Place on your left forearm, just above the wrist. This measures forearm orientation.',
+    part: BodyPart.LEFT_FOOT,
+    label: 'Left foot',
+    hint: 'Move the former left hand node onto the top of your left foot. Keep the ankle node on your shin.',
   },
   {
-    part: BodyPart.RIGHT_LOWER_ARM,
-    label: 'Right hand / wrist',
-    hint: 'Place on your right forearm, just above the wrist. This measures forearm orientation.',
+    part: BodyPart.RIGHT_FOOT,
+    label: 'Right foot',
+    hint: 'Move the former right hand node onto the top of your right foot. Keep the ankle node on your shin.',
   },
   {
     part: BodyPart.LEFT_UPPER_LEG,
@@ -62,9 +62,17 @@ export function nodeHardwareName(tracker: TrackerDataT) {
   );
 }
 
+export function legacyHandLabel(part: BodyPart | undefined) {
+  if (part === BodyPart.LEFT_LOWER_ARM || part === BodyPart.LEFT_HAND)
+    return 'Left hand / wrist';
+  if (part === BodyPart.RIGHT_LOWER_ARM || part === BodyPart.RIGHT_HAND)
+    return 'Right hand / wrist';
+  return null;
+}
 export function nodeLabel(tracker: TrackerDataT) {
   return (
     nodePosition(tracker.info?.bodyPart)?.label ??
+    legacyHandLabel(tracker.info?.bodyPart) ??
     (!tracker.info?.bodyPart ? 'Unassigned' : 'Other position')
   );
 }

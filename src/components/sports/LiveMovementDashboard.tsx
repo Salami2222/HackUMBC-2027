@@ -9,21 +9,24 @@ import {
   RpcMessage,
   TrackerStatus,
 } from 'solarxr-protocol';
+
 import { Vector3 } from 'three';
+import {
+  SkeletonVisualizerWidget,
+  SkeletonPreviewView,
+  setSkeletonView,
+} from '@/components/widgets/SkeletonVisualizerWidget';
 import { bonesAtom, flatTrackersAtom } from '@/store/app-store';
 import { useWebsocketAPI } from '@/hooks/websocket-api';
 import { useReset } from '@/hooks/reset';
 import { QuaternionToEulerDegrees } from '@/maths/quaternion';
-import {
-  SkeletonPreviewView,
-  SkeletonVisualizerWidget,
-} from '@/components/widgets/SkeletonVisualizerWidget';
+
 import './SportsDashboard.scss';
 import { NodeSetup } from './NodeSetup';
 import { NodePicker } from './NodePicker';
 import { NodeOrientation } from './NodeOrientation';
 import { NodeBattery } from './NodeBattery';
-import { MeasurementPanel } from './MeasurementPanel';
+
 import { TrackingServiceControl } from './TrackingServiceControl';
 import { useMeasurements } from '@/measurement/MeasurementProvider';
 
@@ -32,11 +35,14 @@ import {
   nodePosition,
   nodeKey,
   nodeLabel,
+  legacyHandLabel,
   nodeHardwareName,
 } from './node-positions';
 
 export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
   const measurements = useMeasurements();
+  const view = useRef<SkeletonPreviewView | null>(null);
+  const [viewMode, setViewMode] = useState<'Front' | 'Side' | '3D'>('Front');
   const { isConnected, sendRPCPacket, useDataFeedPacket } = useWebsocketAPI();
   const trackers = useAtomValue(flatTrackersAtom).filter(
     ({ tracker }) => tracker.info?.isImu && !tracker.info.isComputed
@@ -44,6 +50,7 @@ export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
   const bones = useAtomValue(bonesAtom);
   const [selectedKey, setSelectedKey] = useState('');
   const [setupOpen, setSetupOpen] = useState(false);
+  const [armsOpen, setArmsOpen] = useState(false);
   const [draft, setDraft] = useState<{ key: string; part: BodyPart } | null>(
     null
   );
@@ -56,7 +63,7 @@ export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
   } | null>(null);
   const [calibrationMessage, setCalibrationMessage] = useState('');
   const received = useRef({ trackers: 0, bones: 0 });
-  const view = useRef<SkeletonPreviewView | null>(null);
+
   const assignmentPanel = useRef<HTMLElement>(null);
   const reset = useReset(
     { type: ResetType.Full },
@@ -88,7 +95,8 @@ export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
   }, []);
 
   const available = trackers.filter(
-    ({ tracker }) => tracker.status === TrackerStatus.OK
+    ({ tracker }) =>
+      tracker.status === TrackerStatus.OK && (tracker.tps ?? 0) > 0
   );
   const selected = selectedKey
     ? trackers.find(({ tracker }) => nodeKey(tracker) === selectedKey)?.tracker
@@ -106,7 +114,9 @@ export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
   const selectedId = selected ? nodeKey(selected) : '';
   const position = nodePosition(selected?.info?.bodyPart);
   const targetPart =
-    draft?.key === selectedId ? draft.part : (position?.part ?? BodyPart.CHEST);
+    draft?.key === selectedId
+      ? draft.part
+      : (selected?.info?.bodyPart ?? BodyPart.CHEST);
   const targetPosition = nodePosition(targetPart);
   const occupied =
     targetPart !== BodyPart.NONE
@@ -187,201 +197,319 @@ export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
     });
     setCalibrationMessage('');
   };
-  const setView = (position: Vector3) => {
-    if (!view.current) return;
-    view.current.camera.position.copy(position);
-    view.current.controls.update();
+  const selectNode = (key: string) => {
+    setSelectedKey(key);
+    setAssignment(null);
+    setDraft(null);
+    setCalibrationMessage('');
   };
+  const armParts = new Set([
+    BodyPart.LEFT_UPPER_ARM,
+    BodyPart.RIGHT_UPPER_ARM,
+    BodyPart.LEFT_LOWER_ARM,
+    BodyPart.RIGHT_LOWER_ARM,
+  ]);
+  const ordered = [...trackers].sort((a, b) => {
+    const order = [
+      BodyPart.HEAD,
+      BodyPart.CHEST,
+      BodyPart.LEFT_UPPER_LEG,
+      BodyPart.RIGHT_UPPER_LEG,
+      BodyPart.LEFT_LOWER_LEG,
+      BodyPart.RIGHT_LOWER_LEG,
+    ];
+    const rank = (part: BodyPart | undefined) => {
+      const index = order.indexOf(part ?? BodyPart.NONE);
+      return index < 0 ? 10 : index;
+    };
+    return rank(a.tracker.info?.bodyPart) - rank(b.tracker.info?.bodyPart);
+  });
+  const arms = ordered.filter(({ tracker }) =>
+    armParts.has(tracker.info?.bodyPart ?? BodyPart.NONE)
+  );
+  const visibleTrackers = ordered.filter(
+    ({ tracker }) =>
+      armsOpen || !armParts.has(tracker.info?.bodyPart ?? BodyPart.NONE)
+  );
+  const readyCount = measurements.roles.filter((role) => !role.reason).length;
+  const toolbar = (
+    <div className="calibration-header-tools">
+      <span
+        className={`connection-count ${fresh && available.length ? 'is-online' : ''}`}
+      >
+        <i />
+        {fresh ? available.length : 0} nodes online
+      </span>
+      <button
+        className="secondary-button"
+        onClick={() => setSetupOpen(!setupOpen)}
+        aria-expanded={setupOpen}
+        aria-controls="connection-drawer"
+      >
+        Connect nodes
+      </button>
+      <NodeOrientation
+        ready={
+          fresh &&
+          assignedOnline.length > 0 &&
+          !assignmentPending &&
+          !measurements.migrationRequired
+        }
+        nodeCount={fresh ? assignedOnline.length : 0}
+        blockedReason={
+          !isConnected
+            ? 'Tracking service disconnected. Open service options to restart.'
+            : !fresh
+              ? 'Waiting for fresh tracker data.'
+              : assignmentPending
+                ? 'Waiting for the assignment to be saved.'
+                : measurements.migrationRequired
+                  ? measurements.message
+                  : 'Connect and assign a node to begin.'
+        }
+        otherResetBusy={reset.status === 'counting'}
+        configurationKey={assignedOnline
+          .map(({ tracker }) => `${nodeKey(tracker)}:${tracker.info?.bodyPart}`)
+          .sort()
+          .join('|')}
+        onStart={measurements.invalidate}
+        onComplete={measurements.confirmOrientation}
+      />
+      <details className="service-menu">
+        <summary aria-label="Tracking service options">•••</summary>
+        <div className="service-menu-content">
+          <TrackingServiceControl />
+          <button
+            className="secondary-button"
+            disabled={!fresh || !assignedOnline.length || reset.disabled}
+            onClick={() => {
+              setCalibrationMessage('Stand upright while the pose resets.');
+              reset.triggerReset();
+            }}
+          >
+            {reset.status === 'counting'
+              ? `Resetting ${reset.timer}`
+              : 'Reset upright pose'}
+          </button>
+          {calibrationMessage && <p role="status">{calibrationMessage}</p>}
+        </div>
+      </details>
+    </div>
+  );
 
   return (
     <main
-      className="sports-content calibration-screen"
+      className="sports-content calibration-workspace"
       aria-label="Sensor Calibration"
     >
-      <div className="calibration-toolbar">
-        <div className="calibration-top-actions">
-          <button
-            className="secondary-button"
-            onClick={() => setSetupOpen(!setupOpen)}
-            aria-expanded={setupOpen}
-            aria-controls="node-setup-content"
-          >
-            Connect nodes
-          </button>
-          <NodeOrientation
-            ready={fresh && assignedOnline.length > 0 && !assignmentPending}
-            nodeCount={fresh ? assignedOnline.length : 0}
-            blockedReason={
-              !isConnected
-                ? 'The tracking service is disconnected. Restart the service if needed.'
-                : !fresh
-                  ? 'Waiting for fresh tracker data from the service.'
-                  : assignmentPending
-                    ? 'Waiting for the body assignment to be saved.'
-                    : 'No assigned nodes are online. Connect the computer and nodes to the same Wi-Fi, then assign their body positions.'
-            }
-            otherResetBusy={reset.status === 'counting'}
-            configurationKey={assignedOnline
-              .map(
-                ({ tracker }) => `${nodeKey(tracker)}:${tracker.info?.bodyPart}`
-              )
-              .sort()
-              .join('|')}
-            onStart={measurements.invalidate}
-            onComplete={measurements.confirmOrientation}
-          />
-        </div>
-        <TrackingServiceControl />
+      {toolbar}
+      <div
+        id="connection-drawer"
+        className="connection-drawer"
+        hidden={!setupOpen}
+      >
+        <NodeSetup open={setupOpen} onToggle={() => setSetupOpen(!setupOpen)} />
       </div>
-      <div className="calibration-layout">
+      {measurements.migrationRequired && (
+        <p className="workspace-notice" role="alert">
+          {measurements.message}
+        </p>
+      )}
+      <div className="calibration-workspace-grid">
         <section
-          className="calibration-controls"
-          aria-label="Calibrate a sensor"
+          ref={assignmentPanel}
+          className="node-inspector"
+          aria-label="Selected node and calibration"
         >
-          <div className="calibration-status" role="status">
-            <i className={live ? 'is-running' : ''} />
-            <span>{status}</span>
-          </div>
           <NodePicker
-            label="Node"
+            label="Selected node"
             disabled={!!assignmentPending}
             value={selectedId}
-            placeholder={
-              trackers.length ? 'Choose a node' : 'No nodes added yet'
-            }
-            onChange={(value) => {
-              setSelectedKey(value);
-              setAssignment(null);
-              setDraft(null);
-              setCalibrationMessage('');
-            }}
+            placeholder="Choose a node"
+            onChange={selectNode}
             options={trackers.map(({ tracker }) => ({
               value: nodeKey(tracker),
               label: nodeLabel(tracker),
-              detail: `${nodeHardwareName(tracker)} · ${
-                !fresh
-                  ? 'Offline'
-                  : tracker.status === TrackerStatus.OK
-                    ? 'Online'
-                    : tracker.status === TrackerStatus.BUSY
-                      ? 'Starting'
-                      : tracker.status === TrackerStatus.ERROR
-                        ? 'Needs attention'
-                        : 'Offline'
-              }`,
+              detail: nodeHardwareName(tracker),
             }))}
           />
-
-          <section
-            ref={assignmentPanel}
-            className="node-assignment"
-            aria-label="Body position assignment"
+          <NodePicker
+            label="Body position"
+            value={String(targetPart)}
+            placeholder="Choose a position"
+            disabled={!selected || !!assignmentPending}
+            onChange={(value) => {
+              setDraft({ key: selectedId, part: Number(value) });
+              setAssignment(null);
+            }}
+            options={[
+              ...(legacyHandLabel(selected?.info?.bodyPart)
+                ? [
+                    {
+                      value: String(selected!.info!.bodyPart),
+                      label: `${legacyHandLabel(selected?.info?.bodyPart)} — switch to feet`,
+                    },
+                  ]
+                : []),
+              ...NODE_POSITIONS.map(({ part, label }) => ({
+                value: String(part),
+                label,
+                detail: trackers.some(
+                  ({ tracker }) =>
+                    nodeKey(tracker) !== selectedId &&
+                    tracker.info?.bodyPart === part
+                )
+                  ? 'In use'
+                  : undefined,
+              })),
+              { value: String(BodyPart.NONE), label: 'Unassigned' },
+            ]}
+          />
+          {legacyHandLabel(selected?.info?.bodyPart) && (
+            <p className="workspace-notice" role="alert">
+              This node is still designated{' '}
+              {legacyHandLabel(selected?.info?.bodyPart)}. Move it onto the
+              matching foot, select Left foot or Right foot, and save. Keep your
+              ankle / shin node in place.
+            </p>
+          )}
+          {unchanged && !legacyHandLabel(selected?.info?.bodyPart) ? (
+            <p className="assignment-confirmation">
+              <span aria-hidden="true">✓</span> Assignment saved
+            </p>
+          ) : (
+            <button
+              className="secondary-button save-node"
+              onClick={assignPosition}
+              disabled={
+                !fresh ||
+                !selected ||
+                unchanged ||
+                !!occupied ||
+                !!assignmentPending
+              }
+            >
+              {assignmentPending ? 'Saving…' : 'Save assignment'}
+            </button>
+          )}
+          {occupied && !unchanged && (
+            <p className="workspace-notice" role="status">
+              {targetPosition?.label} is in use. Unassign the other node first.
+            </p>
+          )}
+          {assignment && !assignedConfirmation && !assignmentPending && (
+            <p className="workspace-notice" role="status">
+              Assignment not confirmed. Retry when connected.
+            </p>
+          )}
+          <ol className="calibration-steps">
+            <li
+              data-complete={measurements.coreReady}
+              data-current={!measurements.coreReady}
+            >
+              <span className="step-marker" aria-hidden="true">
+                {measurements.coreReady ? '✓' : '1'}
+              </span>
+              <div>
+                <strong>1. Connect</strong>
+                <small>
+                  {measurements.coreReady
+                    ? 'Measurement nodes online'
+                    : `${readyCount} of 8 measurement nodes ready`}
+                </small>
+              </div>
+            </li>
+            <li
+              data-complete={measurements.oriented}
+              data-current={measurements.coreReady && !measurements.oriented}
+            >
+              <span className="step-marker" aria-hidden="true">
+                {measurements.oriented ? '✓' : '2'}
+              </span>
+              <div>
+                <strong>2. Orient</strong>
+                <small>
+                  {measurements.oriented
+                    ? 'Orientation confirmed'
+                    : 'Auto-orient in the ski pose'}
+                </small>
+              </div>
+            </li>
+            <li
+              data-complete={measurements.referenceReady}
+              data-current={
+                measurements.oriented && !measurements.referenceReady
+              }
+            >
+              <span className="step-marker" aria-hidden="true">
+                {measurements.referenceReady ? '✓' : '3'}
+              </span>
+              <div>
+                <strong>3. Capture reference</strong>
+                <small>
+                  {measurements.referenceReady
+                    ? 'Reference captured'
+                    : 'Stand upright in a neutral pose'}
+                </small>
+              </div>
+            </li>
+          </ol>
+          <button
+            className="primary-button capture-reference"
+            disabled={
+              !measurements.coreReady ||
+              !measurements.oriented ||
+              measurements.capturing
+            }
+            onClick={measurements.captureReference}
           >
-            <div className="node-assignment-controls">
-              <NodePicker
-                label="Body position"
-                value={String(targetPart)}
-                placeholder="Choose a position"
-                disabled={!selected || !!assignmentPending}
-                onChange={(value) => {
-                  setDraft({ key: selectedId, part: Number(value) });
-                  setAssignment(null);
-                }}
-                options={[
-                  ...NODE_POSITIONS.map(({ part, label }) => ({
-                    value: String(part),
-                    label,
-                    detail: trackers.some(
-                      ({ tracker }) =>
-                        nodeKey(tracker) !== selectedId &&
-                        tracker.info?.bodyPart === part
-                    )
-                      ? 'In use'
-                      : undefined,
-                  })),
-                  { value: String(BodyPart.NONE), label: 'Unassigned' },
-                ]}
+            <span aria-hidden="true">◎</span>
+            {measurements.capturing
+              ? 'Hold still…'
+              : measurements.referenceReady
+                ? 'Recapture reference'
+                : 'Capture reference'}
+          </button>
+          {measurements.capturing && (
+            <>
+              <progress
+                aria-label="Upright reference capture"
+                value={measurements.progress}
+                max={1}
               />
               <button
-                className="primary-button"
-                onClick={assignPosition}
-                disabled={
-                  !fresh ||
-                  !selected ||
-                  unchanged ||
-                  !!occupied ||
-                  !!assignmentPending
-                }
+                className="cancel-reference"
+                onClick={measurements.cancelReference}
               >
-                {assignmentPending
-                  ? 'Saving…'
-                  : unchanged
-                    ? 'Assignment saved'
-                    : targetPart === BodyPart.NONE
-                      ? 'Unassign node'
-                      : 'Save assignment'}
+                Cancel
               </button>
-            </div>
-            <div className="node-assignment-help" role="status">
-              <strong>
-                {selected
-                  ? `${nodeLabel(selected)} · ${nodeHardwareName(selected)}`
-                  : 'Select a node to assign its position'}
-              </strong>
-              <p>
-                {occupied
-                  ? `${targetPosition?.label} is already assigned to ${nodeHardwareName(occupied)}. Unassign that node first or choose another position.`
-                  : (targetPosition?.hint ??
-                    'Remove this node from the body without disconnecting it.')}{' '}
-                Left and right refer to your own body.
-              </p>
-              {assignedConfirmation && (
-                <p>
-                  Saved. The node name and body position will be kept when it
-                  reconnects.
+            </>
+          )}
+          <details className="calibration-details">
+            <summary>Setup details</summary>
+            <p role="status">{measurements.message}</p>
+            {measurements.roles
+              .filter((role) => role.reason)
+              .map((role) => (
+                <p key={role.part}>
+                  {role.label}: {role.reason}
                 </p>
-              )}
-            </div>
-          </section>
-
-          <div className="calibration-actions">
-            {' '}
-            <button
-              className="secondary-button"
-              disabled={!fresh || !assignedOnline.length || reset.disabled}
-              onClick={() => {
-                setCalibrationMessage(
-                  'Stand upright and face forward while your pose resets.'
-                );
-                reset.triggerReset();
-              }}
-            >
-              {reset.status === 'counting'
-                ? `Resetting ${reset.timer}`
-                : 'Reset upright pose'}
-            </button>
-          </div>
-          {assignment && !assignedConfirmation && !assignmentPending && (
-            <p className="calibration-feedback" role="status">
-              Assignment was not confirmed. Check the connection and retry.
-            </p>
-          )}
-          {calibrationMessage && (
-            <p className="calibration-feedback" role="status">
-              {calibrationMessage}
-            </p>
-          )}
-          {angles && (
-            <div className="sensor-readout">
-              <span data-testid="node-orientation">
-                {position?.label} · pitch {angles.x.toFixed(1)}° · yaw{' '}
-                {angles.y.toFixed(1)}° · roll {angles.z.toFixed(1)}°
-              </span>
-            </div>
-          )}
+              ))}
+            {selected && <p>{targetPosition?.hint}</p>}
+            <p>{status}</p>
+            {angles && (
+              <p data-testid="node-orientation">
+                Pitch {angles.x.toFixed(1)}° · Yaw {angles.y.toFixed(1)}° · Roll{' '}
+                {angles.z.toFixed(1)}°
+              </p>
+            )}
+          </details>
         </section>
-        <section className="sensor-preview" aria-label="Live skeleton preview">
-          <div className="sports-viewport">
+        <section
+          className="calibration-body-stage"
+          aria-label="Body tracking viewport"
+        >
+          <div className="original-skeleton-viewport">
             {active && skeletonLive ? (
               <SkeletonVisualizerWidget
                 floorAnchored
@@ -392,107 +520,78 @@ export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
                       bottom: 0,
                       width: 1,
                       height: 1,
-                      position: new Vector3(2.5, 1.9, -2.8),
+                      position: new Vector3(0, 1, -4),
                       onHeightChange(v, height) {
-                        v.controls.target.set(0, height / 2.2, 0);
-                        v.camera.zoom = 1 / (Math.max(1, height) / 1.55);
-                        v.camera.updateProjectionMatrix();
+                        setSkeletonView(v, v.framing?.mode ?? 'Front', height);
                       },
                     }) ?? null;
+                  setViewMode('Front');
                 }}
               />
             ) : (
-              <div className="live-empty-state">
-                <strong>{status}</strong>
-                <span>
-                  Connect and calibrate a node to preview the live pose.
+              <div className="viewport-offline-state">
+                <span className="offline-pose-icon" aria-hidden="true">
+                  ◎
                 </span>
+                <strong>
+                  {isConnected
+                    ? 'Waiting for live tracking'
+                    : 'Tracking service offline'}
+                </strong>
+                <span>Connect your nodes to see your pose.</span>
               </div>
             )}
           </div>
-          <div className="stage-footer">
-            <div className="view-buttons" aria-label="Skeleton view">
+          <div
+            className="body-view-controls"
+            role="group"
+            aria-label="Skeleton view"
+          >
+            {(['Front', 'Side', '3D'] as const).map((mode) => (
               <button
+                key={mode}
                 disabled={!skeletonLive}
-                onClick={() => setView(new Vector3(0, 1.3, -4))}
-              >
-                Front
-              </button>
-              <button
-                disabled={!skeletonLive}
-                onClick={() => setView(new Vector3(4, 1.3, 0))}
-              >
-                Side
-              </button>
-              <button
-                disabled={!skeletonLive}
-                onClick={() => setView(new Vector3(2.5, 1.9, -2.8))}
-              >
-                3D
-              </button>
-            </div>
-          </div>
-        </section>
-      </div>
-      <MeasurementPanel setup />
-      <NodeSetup open={setupOpen} onToggle={() => setSetupOpen(!setupOpen)} />
-      {unassignedOnline.length > 0 && (
-        <section
-          className="live-connection-note node-assignment-notice"
-          aria-label="Nodes awaiting assignment"
-        >
-          <strong>Online nodes awaiting a body position</strong>
-          <p>
-            These nodes are sending data but will not drive the skeleton until
-            assigned. Each node has its own saved position.
-          </p>
-          <div>
-            {unassignedOnline.map(({ tracker }) => (
-              <button
-                key={nodeKey(tracker)}
-                className="secondary-button"
-                disabled={
-                  !!assignmentPending || nodeKey(tracker) === selectedId
-                }
+                aria-pressed={viewMode === mode}
                 onClick={() => {
-                  setSelectedKey(nodeKey(tracker));
-                  setDraft(null);
-                  setAssignment(null);
-                  setCalibrationMessage('');
+                  const v = view.current;
+                  if (!v) return;
+                  setSkeletonView(v, mode);
+                  setViewMode(mode);
                 }}
               >
-                {nodeKey(tracker) === selectedId ? 'Selected' : 'Select'}{' '}
-                {nodeHardwareName(tracker)}
+                {mode}
               </button>
             ))}
           </div>
         </section>
-      )}
-
-      <section
-        className="sports-panel node-manager"
-        aria-label="Node connection manager"
-      >
-        <div className="panel-top">
-          <span className="panel-tag">
-            {fresh ? available.length : 0} ONLINE ·{' '}
-            {fresh ? assignedOnline.length : 0} ASSIGNED ONLINE
-          </span>
+      </div>
+      <section className="connected-nodes-panel" aria-label="Connected nodes">
+        <div className="connected-nodes-heading">
+          <h2>Connected nodes</h2>
+          {unassignedOnline.length > 0 && (
+            <span>{unassignedOnline.length} need a position</span>
+          )}
         </div>
-        {trackers.length === 0 ? (
-          <p className="node-manager-description">
-            No nodes detected. Open Connect nodes to set up Wi-Fi over USB.
-          </p>
-        ) : (
-          <div className="node-manager-list">
-            {[...trackers]
-              .sort(
-                (a, b) =>
-                  Number(b.tracker.status === TrackerStatus.OK) -
-                  Number(a.tracker.status === TrackerStatus.OK)
-              )
-              .map(({ tracker, device }) => {
-                const online = fresh && tracker.status === TrackerStatus.OK;
+        <div className="connected-nodes-scroll">
+          <table className="connected-nodes-table">
+            <thead>
+              <tr>
+                <th>Node</th>
+                <th>Position</th>
+                <th>Status</th>
+                <th>Battery</th>
+                <th>Data rate</th>
+                <th>
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleTrackers.map(({ tracker, device }) => {
+                const online =
+                  fresh &&
+                  tracker.status === TrackerStatus.OK &&
+                  (tracker.tps ?? 0) > 0;
                 const state =
                   !fresh || tracker.status === TrackerStatus.DISCONNECTED
                     ? 'Offline'
@@ -500,60 +599,75 @@ export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
                       ? 'Online'
                       : tracker.status === TrackerStatus.BUSY
                         ? 'Starting'
-                        : 'Not streaming';
+                        : 'No data';
                 return (
-                  <div
-                    className={`node-manager-row ${nodeKey(tracker) === selectedId ? 'is-selected' : ''}`}
+                  <tr
                     key={nodeKey(tracker)}
+                    data-selected={nodeKey(tracker) === selectedId}
                   >
-                    <div>
-                      <strong>{nodeHardwareName(tracker)}</strong>
-                      <small>
-                        {nodeKey(tracker) === selectedId
-                          ? 'Selected node'
-                          : 'Physical node'}
-                      </small>
-                    </div>
-                    <span className={`node-state ${online ? 'is-online' : ''}`}>
-                      {state}
-                    </span>
-                    <div>
-                      <small>Body position</small>
-                      <strong>{nodeLabel(tracker)}</strong>
-                    </div>
-                    <div>
-                      <small>Data rate</small>
-                      <strong>
-                        {online && tracker.tps != null
-                          ? `${Math.round(tracker.tps)} packets/s`
-                          : '—'}
-                      </strong>
-                    </div>
-                    <NodeBattery
-                      hardware={device?.hardwareStatus}
-                      online={online}
-                    />
-                    <button
-                      className="secondary-button"
-                      aria-label={`Configure ${nodeHardwareName(tracker)}`}
-                      disabled={!!assignmentPending}
-                      onClick={() => {
-                        setSelectedKey(nodeKey(tracker));
-                        setDraft(null);
-                        setAssignment(null);
-                        setCalibrationMessage('');
-                        assignmentPanel.current?.scrollIntoView({
-                          behavior: 'smooth',
-                          block: 'center',
-                        });
-                      }}
-                    >
-                      Configure
-                    </button>
-                  </div>
+                    <td>
+                      <button
+                        className="table-node-select"
+                        onClick={() => selectNode(nodeKey(tracker))}
+                        disabled={!!assignmentPending}
+                      >
+                        <i />
+                        {nodeLabel(tracker)}
+                        <small>{nodeHardwareName(tracker)}</small>
+                      </button>
+                    </td>
+                    <td>{nodeLabel(tracker)}</td>
+                    <td>
+                      <span
+                        className={`table-node-status ${online ? 'is-online' : ''}`}
+                      >
+                        <i />
+                        {state}
+                      </span>
+                    </td>
+                    <td>
+                      <NodeBattery
+                        hardware={device?.hardwareStatus}
+                        online={online}
+                        compact
+                      />
+                    </td>
+                    <td>{online ? `${Math.round(tracker.tps!)} Hz` : '—'}</td>
+                    <td>
+                      <button
+                        className="node-row-action"
+                        aria-label={`Configure ${nodeHardwareName(tracker)}`}
+                        disabled={!!assignmentPending}
+                        onClick={() => {
+                          selectNode(nodeKey(tracker));
+                          assignmentPanel.current?.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'nearest',
+                          });
+                        }}
+                      >
+                        •••
+                      </button>
+                    </td>
+                  </tr>
                 );
               })}
-          </div>
+            </tbody>
+          </table>
+        </div>
+        {!trackers.length && (
+          <p className="nodes-empty">
+            No nodes yet. Select Connect nodes to get started.
+          </p>
+        )}
+        {arms.length > 0 && (
+          <button
+            className="arm-node-toggle"
+            aria-expanded={armsOpen}
+            onClick={() => setArmsOpen(!armsOpen)}
+          >
+            {armsOpen ? '−' : '+'} {arms.length} arm nodes
+          </button>
         )}
       </section>
     </main>

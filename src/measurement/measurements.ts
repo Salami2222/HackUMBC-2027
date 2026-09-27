@@ -8,6 +8,8 @@ export const CORE_ROLES = [
   { part: BodyPart.RIGHT_UPPER_LEG, label: 'Right knee / thigh' },
   { part: BodyPart.LEFT_LOWER_LEG, label: 'Left ankle / shin' },
   { part: BodyPart.RIGHT_LOWER_LEG, label: 'Right ankle / shin' },
+  { part: BodyPart.LEFT_FOOT, label: 'Left foot' },
+  { part: BodyPart.RIGHT_FOOT, label: 'Right foot' },
 ] as const;
 export const FRESH_MS = 1000;
 const HOLD_MS = 3000;
@@ -38,6 +40,7 @@ export interface MeasurementState {
   referenceCapturedAt: number | null;
   roles: RoleReading[];
   coreReady: boolean;
+  migrationRequired: boolean;
   oriented: boolean;
   referenceReady: boolean;
   capturing: boolean;
@@ -55,6 +58,14 @@ export function normalizedRotation(tracker: TrackerDataT): Quaternion | null {
   return new Quaternion(q.x, q.y, q.z, q.w).normalize();
 }
 
+export function isLegacyHand(part: BodyPart | undefined) {
+  return [
+    BodyPart.LEFT_HAND,
+    BodyPart.RIGHT_HAND,
+    BodyPart.LEFT_LOWER_ARM,
+    BodyPart.RIGHT_LOWER_ARM,
+  ].includes(part!);
+}
 export function assignmentSignature(trackers: TrackerDataT[]): string {
   return JSON.stringify(
     trackers
@@ -62,7 +73,8 @@ export function assignmentSignature(trackers: TrackerDataT[]): string {
         (t) =>
           t.info?.isImu &&
           !t.info.isComputed &&
-          CORE_ROLES.some(({ part }) => part === t.info?.bodyPart)
+          (CORE_ROLES.some(({ part }) => part === t.info?.bodyPart) ||
+            isLegacyHand(t.info?.bodyPart))
       )
       .map((t) => [
         t.info?.bodyPart,
@@ -224,6 +236,65 @@ export function measure(
         : null,
     reason: left.reason ?? right.reason,
   });
+  // Neutral-relative segment orientation. These are movement measures, not clinical joint angles.
+  for (const [part, prefix] of [
+    [BodyPart.CHEST, 'chest'],
+    [BodyPart.HEAD, 'head'],
+    [BodyPart.LEFT_FOOT, 'leftFoot'],
+    [BodyPart.RIGHT_FOOT, 'rightFoot'],
+  ] as const) {
+    const role = roles.find((r) => r.part === part);
+    const neutral = reference?.rotations.get(part);
+    const delta =
+      role?.rotation && neutral
+        ? neutral.clone().invert().multiply(role.rotation)
+        : null;
+    const euler = delta ? new Euler().setFromQuaternion(delta, 'YXZ') : null;
+    for (const axis of ['Pitch', 'Roll'] as const) {
+      const reason =
+        role?.reason ??
+        (!neutral
+          ? 'Capture an upright reference'
+          : !euler || Math.abs(Math.cos(euler.x)) < 0.1
+            ? 'Orientation near angle singularity'
+            : null);
+      result.push({
+        id: `${prefix}${axis === 'Pitch' ? 'Tilt' : 'Roll'}`,
+        label: `${role?.label ?? prefix} ${axis.toLowerCase()}`,
+        value:
+          !reason && euler ? (axis === 'Pitch' ? euler.x : euler.z) * DEGREES : null,
+        reason,
+      });
+    }
+  }
+  for (const [shin, foot, id] of [
+    [BodyPart.LEFT_LOWER_LEG, BodyPart.LEFT_FOOT, 'leftAnkle'],
+    [BodyPart.RIGHT_LOWER_LEG, BodyPart.RIGHT_FOOT, 'rightAnkle'],
+  ] as const) {
+    const a = roles.find((r) => r.part === shin),
+      b = roles.find((r) => r.part === foot);
+    const na = reference?.rotations.get(shin),
+      nb = reference?.rotations.get(foot);
+    const delta =
+      a?.rotation && b?.rotation && na && nb
+        ? relativeChange(a.rotation, b.rotation, na, nb)
+        : null;
+    const euler = delta ? new Euler().setFromQuaternion(delta, 'YXZ') : null;
+    const reason =
+      a?.reason ??
+      b?.reason ??
+      (!euler
+        ? 'Capture an upright reference'
+        : Math.abs(Math.cos(euler.x)) < 0.1
+          ? 'Orientation near angle singularity'
+          : null);
+    result.push({
+      id,
+      label: `${id === 'leftAnkle' ? 'Left' : 'Right'} ankle flexion`,
+      value: !reason && euler ? euler.x * DEGREES : null,
+      reason,
+    });
+  }
   return result;
 }
 
@@ -238,7 +309,8 @@ export class MeasurementEngine {
     startedAt: number;
     samples: { time: number; rotations: Rotations }[];
   } | null = null;
-  private message = 'Assign the six measurement nodes, then run Auto-orient trackers.';
+  private message =
+    'Assign the eight measurement nodes, including both feet, then run Auto-orient trackers.';
 
   setConnected(connected: boolean) {
     if (this.connected === connected) return;
@@ -261,7 +333,7 @@ export class MeasurementEngine {
   confirmOrientation(now: number) {
     if (!this.state(now).coreReady) {
       this.message =
-        'Auto-orientation finished, but all six measurement nodes must be ready. Reconnect them and repeat.';
+        'Auto-orientation finished, but all eight measurement nodes must be ready. Reconnect them and repeat.';
       return;
     }
     this.orientedSignature = this.signature;
@@ -296,7 +368,15 @@ export class MeasurementEngine {
     this.receivedAt = now;
     if (!this.capture) return;
     const roles = inspectRoles(trackers, now, now, this.connected);
-    if (roles.some((role) => role.reason)) {
+    if (
+      roles.some((role) => role.reason) ||
+      trackers.some(
+        (t) =>
+          isLegacyHand(t.info?.bodyPart) &&
+          t.status === TrackerStatus.OK &&
+          (t.tps ?? 0) > 0
+      )
+    ) {
       this.capture = null;
       this.message =
         'Reference interrupted: a required node is not reporting usable data.';
@@ -306,6 +386,8 @@ export class MeasurementEngine {
     const rotations = new Map(roles.map((role) => [role.part, role.rotation!]));
     const upright = roles.every(
       (role) =>
+        role.part === BodyPart.LEFT_FOOT ||
+        role.part === BodyPart.RIGHT_FOOT ||
         new Vector3(0, 1, 0).applyQuaternion(role.rotation!).y >= Math.cos(20 / DEGREES)
     );
     if (!upright) {
@@ -367,13 +449,22 @@ export class MeasurementEngine {
     }
     const reference =
       this.reference?.signature === this.signature ? this.reference : null;
+    const migrationRequired = this.trackers.some(
+      (t) =>
+        t.info?.isImu &&
+        !t.info.isComputed &&
+        isLegacyHand(t.info.bodyPart) &&
+        t.status === TrackerStatus.OK &&
+        (t.tps ?? 0) > 0
+    );
     return {
+      migrationRequired,
       sampleTime: this.receivedAt,
       referenceCapturedAt: reference?.capturedAt ?? null,
       roles,
-      coreReady: roles.every((role) => !role.reason),
+      coreReady: !migrationRequired && roles.every((role) => !role.reason),
       oriented: this.orientedSignature === this.signature,
-      referenceReady: !!reference,
+      referenceReady: !!reference && !migrationRequired,
       capturing: !!this.capture,
       progress: this.capture?.samples.length
         ? Math.min(
@@ -381,7 +472,9 @@ export class MeasurementEngine {
             (this.capture.samples.at(-1)!.time - this.capture.samples[0].time) / HOLD_MS
           )
         : 0,
-      message: this.message,
+      message: migrationRequired
+        ? 'Switch hand / wrist nodes to feet tracking: move each node onto the matching foot, save its new assignment, then auto-orient and capture a reference.'
+        : this.message,
       measurements: measure(roles, reference),
     };
   }

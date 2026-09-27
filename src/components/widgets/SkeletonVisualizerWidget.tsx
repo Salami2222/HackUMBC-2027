@@ -29,6 +29,7 @@ import { useConfig } from '@/hooks/config';
 import { Tween } from '@tweenjs/tween.js';
 import { EyeIcon } from '@/components/commons/icon/EyeIcon';
 import { floorOffset, standingHeight } from '@/measurement/floor';
+import { skeletonCameraFrame, SkeletonViewMode } from '@/measurement/viewport';
 
 const GROUND_COLOR = '#2c2c6b';
 
@@ -53,7 +54,30 @@ export type SkeletonPreviewView = {
   hidden: boolean;
   tween: Tween<Vector3>;
   onHeightChange: (view: SkeletonPreviewView, newHeight: number) => void;
+  framing?: { height: number; mode: SkeletonViewMode };
 };
+
+export function setSkeletonView(
+  view: SkeletonPreviewView,
+  mode: SkeletonViewMode,
+  height = view.framing?.height ?? 1.7
+) {
+  const frame = skeletonCameraFrame(
+    height,
+    view.camera.aspect,
+    view.camera.fov,
+    mode
+  );
+  view.framing = { height, mode };
+  view.tween.stop();
+  view.controls.enableDamping = false;
+  view.controls.target.copy(frame.target);
+  view.camera.position.copy(frame.position);
+  view.camera.zoom = 1;
+  view.camera.updateProjectionMatrix();
+  view.controls.update();
+  view.controls.enableDamping = true;
+}
 
 function initializePreview(
   canvas: HTMLCanvasElement,
@@ -203,10 +227,15 @@ function initializePreview(
 
   return {
     resize: (width: number, height: number) => {
+      if (width <= 0 || height <= 0) return;
       resolution.set(width, height);
       skeletonHelper.resolution.copy(resolution);
       if (!renderer) return;
       renderer.setSize(width, height);
+      views.forEach((view) => {
+        view.camera.aspect = (width * view.width) / (height * view.height);
+        if (view.framing) setSkeletonView(view, view.framing.mode);
+      });
     },
     setFrameInterval: (interval: number) => {
       frameInterval = interval;

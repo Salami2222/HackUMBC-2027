@@ -12,6 +12,7 @@ import { bonesAtom, flatTrackersAtom } from '@/store/app-store';
 import { useWebsocketAPI } from '@/hooks/websocket-api';
 import {
   SkeletonPreviewView,
+  setSkeletonView,
   SkeletonVisualizerWidget,
 } from '@/components/widgets/SkeletonVisualizerWidget';
 import './SportsDashboard.scss';
@@ -61,10 +62,8 @@ export function SportsDashboard({ active = true }: { active?: boolean }) {
     now - received.current.bones < 3000 &&
     bones.length > 0;
 
-  const setView = (position: Vector3) => {
-    if (!live || !view.current) return;
-    view.current.camera.position.copy(position);
-    view.current.controls.update();
+  const setView = (mode: 'Front' | 'Side' | '3D') => {
+    if (view.current) setSkeletonView(view.current, mode);
   };
 
   return (
@@ -84,9 +83,7 @@ export function SportsDashboard({ active = true }: { active?: boolean }) {
                     height: 1,
                     position: new Vector3(2.5, 1.9, -2.8),
                     onHeightChange(v, height) {
-                      v.controls.target.set(0, height / 2.2, 0);
-                      v.camera.zoom = 1 / (Math.max(1, height) / 1.55);
-                      v.camera.updateProjectionMatrix();
+                      setSkeletonView(v, v.framing?.mode ?? '3D', height);
                     },
                   }) ?? null;
               }}
@@ -107,22 +104,13 @@ export function SportsDashboard({ active = true }: { active?: boolean }) {
             {live ? 'Live pose · missing segments are estimated' : ''}
           </span>
           <div className="view-buttons" aria-label="Skeleton view">
-            <button
-              disabled={!live}
-              onClick={() => setView(new Vector3(0, 1.3, -4))}
-            >
+            <button disabled={!live} onClick={() => setView('Front')}>
               Front
             </button>
-            <button
-              disabled={!live}
-              onClick={() => setView(new Vector3(4, 1.3, 0))}
-            >
+            <button disabled={!live} onClick={() => setView('Side')}>
               Side
             </button>
-            <button
-              disabled={!live}
-              onClick={() => setView(new Vector3(2.5, 1.9, -2.8))}
-            >
+            <button disabled={!live} onClick={() => setView('3D')}>
               3D
             </button>
           </div>

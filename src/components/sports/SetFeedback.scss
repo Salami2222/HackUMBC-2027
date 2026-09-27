@@ -1,0 +1,144 @@
+.sports-app .form-chart-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sports-app .feedback-trigger {
+  padding: 6px 10px;
+  border: 1px solid #66517d;
+  border-radius: 6px;
+  color: #d8c5f8;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.sports-app .feedback-trigger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.form-score-trace {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  overflow: visible;
+}
+.form-score-trace line {
+  stroke: #b99af1;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.form-score-trace circle {
+  fill: #b99af1;
+  stroke: #ece2ff;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.form-score-trace circle[data-rating='attention'] {
+  fill: #ed96a5;
+}
+.form-score-trace text {
+  fill: #c0b4d3;
+  font-size: 16px;
+}
+.set-feedback {
+  width: min(1040px, 100%);
+  margin: 0 auto;
+
+  padding: 28px;
+  border: 1px solid #67527d;
+  border-radius: 14px;
+  background: #151525;
+  color: #ebe4f8;
+  box-shadow: 0 20px 100px #0009;
+}
+.set-feedback header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.set-feedback header span {
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: #baa7d6;
+}
+.set-feedback h2 {
+  font-size: 28px;
+  margin: 4px 0 14px;
+}
+.set-feedback header button {
+  font-size: 28px;
+  padding: 0 8px;
+}
+.set-feedback p {
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 10px 0;
+}
+.feedback-cues {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0;
+}
+.feedback-cues section {
+  background: #b294df0b;
+  border: 1px solid #463951;
+  border-radius: 8px;
+  padding: 16px;
+}
+.feedback-cues h3 {
+  font-size: 16px;
+  margin: 0 0 4px;
+}
+.feedback-cues span,
+.set-feedback summary {
+  font-size: 12px;
+  color: #bdb0d0;
+}
+.set-feedback table {
+  width: 100%;
+  text-align: left;
+  font-size: 12px;
+  border-collapse: collapse;
+}
+.set-feedback caption {
+  text-align: left;
+  margin: 15px 0;
+  font-weight: 600;
+}
+.set-feedback th,
+.set-feedback td {
+  padding: 10px 6px;
+  border-bottom: 1px solid #43374f;
+}
+.set-feedback footer {
+  margin-top: 18px;
+  color: #a99bbb;
+}
+.set-feedback footer p {
+  font-size: 11px;
+}
+.set-feedback [data-rating='optimal'] {
+  color: #91d6b8;
+}
+.set-feedback [data-rating='suboptimal'] {
+  color: #dfc58c;
+}
+.set-feedback [data-rating='attention'] {
+  color: #e69ead;
+}
+.feedback-unknown {
+  color: #dbbf8b;
+}
+
+.feedback-screen {
+  padding: 32px;
+  min-height: calc(100vh - 72px);
+}
+.feedback-empty {
+  color: #aaa1bc;
+  margin: 15vh auto;
+  text-align: center;
+}

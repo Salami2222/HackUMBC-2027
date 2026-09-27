@@ -55,6 +55,44 @@ function referenced() {
 }
 const metric = (state, id) => state.measurements.find((m) => m.id === id);
 
+test('legacy hand assignments stay intact and block calibration until moved to feet', () => {
+  const { engine, list } = prepared();
+  const foot = node(list, BodyPart.LEFT_FOOT);
+  foot.info.bodyPart = BodyPart.LEFT_LOWER_ARM;
+  engine.ingest(list, 2000);
+  assert.equal(foot.info.bodyPart, BodyPart.LEFT_LOWER_ARM);
+  assert.equal(engine.state(2000).migrationRequired, true);
+  assert.equal(engine.state(2000).coreReady, false);
+  assert.match(engine.state(2000).message, /Switch hand/);
+  engine.confirmOrientation(2000);
+  engine.startReference(2000);
+  assert.equal(engine.state(2000).capturing, false);
+  foot.info.bodyPart = BodyPart.LEFT_FOOT;
+  engine.ingest(list, 2100);
+  assert.equal(engine.state(2100).migrationRequired, false);
+  assert.equal(engine.state(2100).oriented, false);
+});
+
+test('foot reference accepts flat feet and reports relative foot roll and ankle motion', () => {
+  const { engine, list } = prepared();
+  const foot = node(list, BodyPart.LEFT_FOOT);
+  // A flat foot does not share the shin's vertical orientation.
+  const neutral = rotation([1, 0, 0], 80);
+  setRotation(foot, neutral);
+  engine.startReference(1000);
+  for (let t = 1100; t <= 4100; t += 100) engine.ingest(list, t);
+  assert.equal(engine.state(4100).referenceReady, true);
+  setRotation(foot, neutral.clone().multiply(rotation([0, 0, 1], 15)));
+  engine.ingest(list, 4200);
+  assert.ok(
+    Math.abs(metric(engine.state(4200), 'leftFootRoll').value - 15) < 0.01
+  );
+  foot.status = TrackerStatus.DISCONNECTED;
+  engine.ingest(list, 4300);
+  assert.equal(metric(engine.state(4300), 'leftFootRoll').value, null);
+  assert.equal(metric(engine.state(4300), 'leftAnkle').value, null);
+});
+
 test('only real, uniquely assigned, streaming calibrated nodes are usable', () => {
   const list = nodes();
   assert.ok(inspectRoles(list, 1000, 1100, true).every((r) => !r.reason));

@@ -31,7 +31,7 @@ export function MeasurementPanel({ setup = false }: { setup?: boolean }) {
             )}
           </div>
           <p>
-            1. Assign and wear the six measurement nodes below. 2. Run
+            1. Assign and wear the eight measurement nodes below. 2. Run
             Auto-orient trackers. 3. Stand upright with arms down, facing
             forward, and hold still to capture the reference.
           </p>

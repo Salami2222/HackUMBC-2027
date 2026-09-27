@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useAtomValue } from 'jotai';
 import {
   ResetRequestT,
@@ -33,14 +33,15 @@ export function NodeOrientation({
   onComplete: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   const guards = useAtomValue(serverGuardsAtom);
   const { sendRPCPacket, useRPCPacket } = useWebsocketAPI();
   const [step, setStep] = useState<'upright' | 'ski' | 'done'>('upright');
   const [message, setMessage] = useState('');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
-  const [armMode, setArmMode] = useState(ArmsMountingResetMode.TPOSE_UP);
-  const requestedMode = useRef(ArmsMountingResetMode.TPOSE_UP);
+
+  const requestedMode = useRef(ArmsMountingResetMode.BACK);
   const pending = useRef<{
     type: ResetType | 'read-settings' | 'confirm-settings';
     deadline: number;
@@ -168,7 +169,7 @@ export function NodeOrientation({
     setCountdown(null);
     setMessage('');
     if (type === ResetType.Full) {
-      requestedMode.current = armMode;
+      requestedMode.current = ArmsMountingResetMode.BACK;
       pending.current = { type: 'read-settings', deadline: Date.now() + 10000 };
       sendRPCPacket(RpcMessage.SettingsRequest, new SettingsRequestT());
     } else {
@@ -187,67 +188,46 @@ export function NodeOrientation({
           dialog.current?.showModal();
         }}
       >
-        Auto-orient trackers
+        Auto-orient
       </button>
       <dialog
         ref={dialog}
         className="node-orientation-dialog"
-        aria-labelledby="node-orientation-title"
+        aria-labelledby={titleId}
         onCancel={(event) => {
           if (busy) event.preventDefault();
         }}
       >
         <span className="panel-index">TRACKER ORIENTATION</span>
-        <h2 id="node-orientation-title">
+        <h2 id={titleId}>
           {step === 'done'
             ? 'Orientation calibrated'
             : step === 'upright'
               ? '1. Stand upright'
-              : armMode === ArmsMountingResetMode.TPOSE_UP
-                ? '2. T-pose arms, ski-pose legs'
-                : '2. Hold the ski pose'}
+              : '2. Hold the ski pose'}
         </h2>
         <p>
           {step === 'done'
             ? 'The service confirmed mounting calibration. Stand upright, check the live skeleton, then capture an upright reference below. This still needs your visual check; repeat whenever a tracker moves.'
             : step === 'upright'
               ? 'Wear and assign all your nodes first. Face forward with your arms straight down at your sides. Start the reset, then hold still through the countdown.'
-              : armMode === ArmsMountingResetMode.TPOSE_UP
-                ? 'Raise both arms straight out to the sides, 90 degrees from your torso, in a T. For your leg and chest trackers, also bend your knees and lean your torso forward into the ski pose. Hold this combined pose through the countdown.'
-                : 'Bend your knees, lean your upper body forward, and bend your arms as shown. Start auto-orientation and hold this pose through the countdown.'}
+              : 'Bend your knees, lean forward and bend your elbows into the ski pose shown. Hold still through the countdown.'}
         </p>
-        {step === 'upright' && (
-          <label className="node-input">
-            <span>Arm calibration pose</span>
-            <select
-              value={armMode}
-              disabled={busy}
-              onChange={(event) => setArmMode(Number(event.target.value))}
-            >
-              <option value={ArmsMountingResetMode.TPOSE_UP}>
-                T-pose (arms out)
-              </option>
-              <option value={ArmsMountingResetMode.BACK}>
-                Ski pose (arms bent)
-              </option>
-            </select>
-          </label>
+
+        {step !== 'done' && (
+          <img
+            src={
+              step === 'upright'
+                ? '/images/reset/FullResetPose.webp'
+                : '/images/mounting-reset-pose.webp'
+            }
+            alt={
+              step === 'upright'
+                ? 'Stand straight with arms at your sides, facing forward'
+                : 'Ski pose with knees and elbows bent and torso leaning forward'
+            }
+          />
         )}
-        {step !== 'done' &&
-          (step === 'upright' || armMode === ArmsMountingResetMode.BACK) && (
-            <img
-              src={
-                step === 'upright'
-                  ? '/images/reset/FullResetPose.webp'
-                  : '/images/mounting-reset-pose.webp'
-              }
-              alt={
-                step === 'upright'
-                  ? 'Stand straight with arms at your sides, facing forward'
-                  : 'Ski pose with knees and elbows bent and torso leaning forward'
-              }
-            />
-          )}
         <p className="node-orientation-scope">
           {nodeCount} assigned online nodes. Each node gets its own mounting
           correction in one calibration.

@@ -1,10 +1,11 @@
 import { sentryVitePlugin } from '@sentry/vite-plugin';
 import react from '@vitejs/plugin-react';
-import { defineConfig, PluginOption } from 'vite';
+import { defineConfig, loadEnv, PluginOption } from 'vite';
 import { execSync } from 'child_process';
 import path from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
 import jotaiReactRefresh from 'jotai/babel/plugin-react-refresh';
+import { jevPlugin } from './scripts/jev-plugin.mjs';
 import { trackingServicePlugin } from './scripts/tracking-service-plugin.mjs';
 
 function gitOutput(command: string, fallback = '') {
@@ -45,7 +46,7 @@ export function i18nHotReload(): PluginOption {
 }
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   define: {
     __COMMIT_HASH__: JSON.stringify(commitHash),
     __VERSION_TAG__: JSON.stringify(versionTag),
@@ -53,6 +54,7 @@ export default defineConfig({
   },
   plugins: [
     trackingServicePlugin(),
+    jevPlugin(loadEnv(mode, process.cwd(), '')),
     react({ babel: { plugins: [jotaiReactRefresh] } }),
     i18nHotReload(),
     visualizer() as PluginOption,
@@ -90,4 +92,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

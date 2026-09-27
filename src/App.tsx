@@ -20,8 +20,16 @@ import { ElectronContextC, provideElectron } from './hooks/electron';
 import { AppLocalizationProvider } from './i18n/config';
 import { SportsDashboard } from './components/sports/SportsDashboard';
 import { LiveMovementDashboard } from './components/sports/LiveMovementDashboard';
+import {
+  FeedbackDashboard,
+  SetFeedbackNavigation,
+} from './components/sports/SetFeedback';
+import { PresentationDashboard } from './components/sports/PresentationDashboard';
+import { DocumentationPage } from './components/sports/DocumentationPage';
+import { SquatSessionProvider } from './exercise/SquatSessionProvider';
 import { MeasurementProvider } from './measurement/MeasurementProvider';
 import { useHeadlessGrounding } from './hooks/headless-grounding';
+import './components/sports/CalibrationWorkspace.scss';
 export const GH_REPO = 'SlimeVR/SlimeVR-Server';
 export const VersionContext = createContext('');
 export const DOCS_SITE = 'https://docs.slimevr.dev';
@@ -30,11 +38,18 @@ export const SLIMEVR_DISCORD = 'https://discord.gg/slimevr';
 function AppSurface() {
   const { pathname } = useLocation();
   const groundingError = useHeadlessGrounding();
-  if (!['/', '/calibration'].includes(pathname))
+  const [presentationActions, setPresentationActions] =
+    useState<HTMLDivElement | null>(null);
+  if (
+    !['/', '/calibration', '/presentation', '/feedback', '/docs'].includes(
+      pathname
+    )
+  )
     return <Navigate to="/" replace />;
 
   return (
     <div className="sports-app">
+      <SetFeedbackNavigation />
       <header className="sports-header">
         <div className="sports-brand">
           <img
@@ -44,13 +59,41 @@ function AppSurface() {
             width="36"
             height="36"
           />
+          <NavLink
+            to="/docs"
+            className="documentation-link"
+            aria-label="Documentation"
+            title="Documentation"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 5.5C9.3 3.8 6 3.7 3 5v15c3-1.3 6.3-1.2 9 .5 2.7-1.7 6-1.8 9-.5V5c-3-1.3-6.3-1.2-9 .5Z" />
+              <path d="M12 5.5v15M6.5 8.5l2 .3M6.5 12l2 .3M15.5 8.8l2-.3M15.5 12.3l2-.3" />
+            </svg>
+          </NavLink>
         </div>
         <nav className="sports-nav" aria-label="Main navigation">
           <NavLink to="/" end>
             Tracking
           </NavLink>
           <NavLink to="/calibration">Sensor Calibration</NavLink>
+          <NavLink to="/presentation">Presentation</NavLink>
+          <NavLink to="/feedback">Feedback</NavLink>
         </nav>
+        <div
+          className="presentation-header-slot"
+          ref={setPresentationActions}
+          hidden={pathname !== '/presentation'}
+        />
       </header>
       {groundingError && <p role="alert">{groundingError}</p>}
       <div hidden={pathname !== '/'}>
@@ -59,6 +102,11 @@ function AppSurface() {
       <div hidden={pathname !== '/calibration'}>
         <LiveMovementDashboard active={pathname === '/calibration'} />
       </div>
+      {pathname === '/feedback' && <FeedbackDashboard />}
+      {pathname === '/docs' && <DocumentationPage />}
+      {pathname === '/presentation' && (
+        <PresentationDashboard headerTarget={presentationActions} />
+      )}
     </div>
   );
 }
@@ -169,7 +217,9 @@ export default function App() {
                       <div className="h-full w-full text-standard bg-background-80 text-background-10">
                         <Preload />
                         <MeasurementProvider>
-                          <AppSurface />
+                          <SquatSessionProvider>
+                            <AppSurface />
+                          </SquatSessionProvider>
                         </MeasurementProvider>
                       </div>
                     </VersionContext.Provider>
