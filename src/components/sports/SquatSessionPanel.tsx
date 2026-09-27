@@ -1,157 +1,93 @@
-import { SetFeedback } from './SetFeedback';
 import { Link } from 'react-router-dom';
 import { useSquatSession } from '@/exercise/SquatSessionProvider';
 import { PHASE_LABELS } from '@/exercise/squat-phase';
 import {
-  ACCEPTABLE_DEPTH_MIN_DEG,
   HEAD_INCLINATION_LIMIT_DEG,
   HEAD_INCLINATION_LABELS,
-  CompletedSquatRep,
-  WARMUP_REP_COUNT,
 } from '@/exercise/squat';
-function depthLabel(classification: CompletedSquatRep['depthClassification']) {
-  if (classification === 'acceptable') return 'Acceptable depth';
-  if (classification === 'shallow') return 'Shallow';
-  return 'Very shallow';
-}
+import { FormTestSummary, formTestRepLabel } from './FormTestSummary';
+import { SessionModeSelect } from './SessionModeSelect';
+import { SetFeedback } from './SetFeedback';
 
 export function SquatSessionPanel() {
   const {
-    baseline,
+    sessionMode,
+    targetRepCount,
     phase,
-    warmupReps,
+    formTestReps,
+    formTestResult,
     trainingReps,
-    result,
     notice,
     canMeasure,
     head,
     headStatus,
     motion,
     jevStatus,
-    startWarmup,
-    startTraining,
+    startSession,
     stop,
-    dismissResult,
   } = useSquatSession();
-  const latestTrainingRep = trainingReps.at(-1);
-  const status =
-    phase === 'warmup'
-      ? 'Recording warm-up'
-      : phase === 'training'
-        ? 'Session running'
-        : baseline
-          ? 'Baseline ready'
-          : 'No baseline yet';
+  const active = phase !== 'idle';
+  const count =
+    sessionMode === 'form-test' ? formTestReps.length : trainingReps.length;
+  const modeLabel = sessionMode === 'form-test' ? 'Form Test' : 'Working Set';
+  const complete =
+    sessionMode === 'form-test'
+      ? !!formTestResult
+      : count === targetRepCount && !active;
+  const latestWorkingRep = trainingReps.at(-1);
 
   return (
     <section className="squat-session" aria-label="Squat session">
       <div className="squat-session-heading">
         <div>
           <span className="eyebrow">Squat</span>
-          <h2>{result ? 'Warm-up result' : 'Session'}</h2>
+          <h2>{modeLabel}</h2>
         </div>
-        <span role="status">{status}</span>
+        <span role="status">
+          {active ? 'Recording' : complete ? 'Complete' : 'Ready'}
+        </span>
       </div>
-
-      {result ? (
-        <div className="warmup-result" aria-live="polite">
-          <h3>
-            {result.accepted
-              ? 'Warm-Up Complete'
-              : 'Warm-Up Needs to Be Repeated'}
-          </h3>
-          <ol>
-            {result.reps.map((rep) => (
-              <li key={rep.rep}>
-                <span>Rep {rep.rep}</span>
-                <strong>
-                  {depthLabel(rep.depthClassification)} ·{' '}
-                  {rep.achievedKneeFlexion.toFixed(1)}°
-                </strong>
-              </li>
-            ))}
-          </ol>
-          <p>
-            {result.accepted
-              ? 'Baseline accepted.'
-              : `${result.failedDepthRepCount} of ${WARMUP_REP_COUNT} reps did not reach the required squat depth. Retry and aim for at least ${ACCEPTABLE_DEPTH_MIN_DEG}° of knee flexion.`}
-          </p>
-          {!result.accepted && baseline && (
-            <p>Your previous accepted baseline is still available.</p>
-          )}
-          <div className="squat-actions">
-            {result.accepted ? (
-              <button className="primary-button" onClick={dismissResult}>
-                Continue
-              </button>
-            ) : (
-              <>
-                <button
-                  className="primary-button"
-                  onClick={startWarmup}
-                  disabled={!canMeasure}
-                >
-                  Retry Warm-Up
-                </button>
-                <button className="secondary-button" onClick={dismissResult}>
-                  Return to tracking
-                </button>
-              </>
-            )}
-          </div>
+      <SessionModeSelect id="tracking-session-type" />
+      <div className="squat-progress">
+        <div>
+          <span>{modeLabel} reps</span>
+          <strong>
+            {count} <small>/ {targetRepCount}</small>
+          </strong>
         </div>
+      </div>
+      {sessionMode === 'form-test' && formTestResult ? (
+        <FormTestSummary
+          result={formTestResult}
+          onRunAgain={startSession}
+          canMeasure={canMeasure}
+        />
       ) : (
         <>
-          <div className="squat-progress">
-            <div>
-              <span>
-                {phase === 'warmup' ? 'Warm-up reps' : 'Session reps'}
-              </span>
-              <strong>
-                {phase === 'warmup' ? warmupReps.length : trainingReps.length}
-                {phase === 'warmup' && <small> / {WARMUP_REP_COUNT}</small>}
-              </strong>
-            </div>
-            <div>
-              <span>Personal baseline</span>
-              <strong>
-                {baseline
-                  ? `${baseline.averageKneeFlexion.toFixed(1)}°`
-                  : 'Not recorded'}
-              </strong>
-            </div>
-          </div>
           <div className="squat-actions">
             <button
-              className="secondary-button"
-              onClick={startWarmup}
-              disabled={!canMeasure || phase !== 'idle'}
-            >
-              {baseline ? 'Record Baseline Again' : 'Record Baseline'}
-            </button>
-            <button
               className="primary-button"
-              onClick={startTraining}
-              disabled={!baseline || !canMeasure || phase !== 'idle'}
+              onClick={startSession}
+              disabled={!canMeasure || active}
             >
               Start Session
             </button>
             <button
               className="secondary-button"
               onClick={stop}
-              disabled={phase !== 'warmup' && phase !== 'training'}
+              disabled={!active}
             >
               Stop Session
             </button>
           </div>
-          {latestTrainingRep && baseline && (
+          {sessionMode === 'form-test' && formTestReps.length > 0 && (
             <p className="squat-comparison">
-              Latest rep: {latestTrainingRep.achievedKneeFlexion.toFixed(1)}° ·{' '}
-              {depthLabel(latestTrainingRep.depthClassification)} ·{' '}
-              {latestTrainingRep.achievedKneeFlexion >=
-              baseline.averageKneeFlexion
-                ? 'at or deeper than baseline'
-                : 'shallower than baseline'}
+              Latest rep: {formTestRepLabel(formTestReps.at(-1)!)}
+            </p>
+          )}
+          {sessionMode === 'working-set' && latestWorkingRep && (
+            <p className="squat-comparison">
+              Latest rep: {latestWorkingRep.achievedKneeFlexion.toFixed(1)}°
             </p>
           )}
         </>
@@ -179,17 +115,25 @@ export function SquatSessionPanel() {
           {notice}
         </p>
       )}
-      <p className="squat-notice">
-        Depth target: {ACCEPTABLE_DEPTH_MIN_DEG}° knee bend · Head range: ±
-        {HEAD_INCLINATION_LIMIT_DEG}° from upright
-      </p>
-      <p className="squat-notice" data-head-status={headStatus}>
-        {HEAD_INCLINATION_LABELS[headStatus]}
-        {headStatus !== 'unavailable' && head != null
-          ? ` · ${head.toFixed(1)}°`
-          : ''}
-      </p>
-      {(phase === 'warmup' || phase === 'training') && canMeasure && (
+      {sessionMode === 'form-test' ? (
+        <p className="squat-notice">
+          Form Test: 3 reps · Symmetry, torso, depth and head control
+        </p>
+      ) : (
+        <>
+          <p className="squat-notice">
+            Working Set: 8 reps · Head range: ±{HEAD_INCLINATION_LIMIT_DEG}°
+            from upright
+          </p>
+          <p className="squat-notice" data-head-status={headStatus}>
+            {HEAD_INCLINATION_LABELS[headStatus]}
+            {headStatus !== 'unavailable' && head != null
+              ? ` · ${head.toFixed(1)}°`
+              : ''}
+          </p>
+        </>
+      )}
+      {active && canMeasure && (
         <p className="squat-notice">
           Start upright, then squat and return upright to count each rep.
         </p>

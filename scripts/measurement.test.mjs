@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { Quaternion, Vector3 } from 'three';
 import {
   BodyPart,
+  ResetType,
   TrackerDataT,
   TrackerInfoT,
   TrackerIdT,
@@ -205,8 +206,8 @@ test('stale data suppresses every measurement while retaining reference for reco
   assert.ok(state.measurements.every((m) => m.value === null));
 });
 
-test('disconnect, assignment change, mounting change, and reset invalidate calibration', () => {
-  for (const change of ['disconnect', 'assignment', 'mounting', 'reset']) {
+test('assignment changes and mounting resets invalidate calibration', () => {
+  for (const change of ['assignment', 'mounting', 'reset']) {
     const { engine, list } = referenced();
     if (change === 'disconnect') engine.setConnected(false);
     if (change === 'assignment') {
@@ -300,4 +301,33 @@ test('head inclination tracks signed nodding independent of heading and chest le
   node(list, BodyPart.HEAD).status = TrackerStatus.DISCONNECTED;
   engine.ingest(list, 4400);
   assert.equal(metric(engine.state(4400), 'headInclination').value, null);
+});
+
+test('upright and yaw resets clear reference but preserve mounting and allow recapture', () => {
+  for (const type of [ResetType.Full, ResetType.Yaw]) {
+    const { engine, list } = referenced();
+    engine.resetPose(type);
+    assert.equal(engine.state(4200).oriented, true);
+    assert.equal(engine.state(4200).referenceReady, false);
+    engine.startReference(4200);
+    for (let t = 4300; t <= 7300; t += 100) engine.ingest(list, t);
+    assert.equal(engine.state(7300).referenceReady, true);
+  }
+  const { engine } = referenced();
+  engine.resetPose(ResetType.Mounting);
+  assert.equal(engine.state(4200).oriented, false);
+});
+test('brief reconnect preserves mounting, prolonged node absence requires orientation again', () => {
+  const { engine, list } = referenced();
+  engine.setConnected(false);
+  assert.equal(engine.state(4500).oriented, true);
+  engine.setConnected(true);
+  engine.ingest(list, 5000);
+  assert.equal(engine.state(5000).oriented, true);
+  list.forEach((t) => (t.status = TrackerStatus.DISCONNECTED));
+  engine.ingest(list, 5500);
+  assert.equal(engine.state(66000).oriented, false);
+  list.forEach((t) => (t.status = TrackerStatus.OK));
+  engine.ingest(list, 66100);
+  assert.equal(engine.state(66100).oriented, false);
 });

@@ -283,6 +283,7 @@ export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
             className="secondary-button"
             disabled={!fresh || !assignedOnline.length || reset.disabled}
             onClick={() => {
+              measurements.invalidateReference();
               setCalibrationMessage('Stand upright while the pose resets.');
               reset.triggerReset();
             }}

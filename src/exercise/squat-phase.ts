@@ -39,10 +39,9 @@ export const PHASE_LABELS: Record<SquatPhase, string> = {
   bottom: 'Bottom',
   ascending: 'Ascending',
 };
-export const SESSION_REPS = 8;
 export const PHASE_MAX_GAP_MS = 500;
-export const TOP_KNEE_BEND_DEG = 10;
-const TOP_EXIT_DEG = 12;
+export const TOP_KNEE_BEND_DEG = 15;
+const TOP_EXIT_DEG = 17;
 const median = (values: number[]) =>
   [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 const initial = (): PhaseState => ({
@@ -239,7 +238,7 @@ export class SquatPhaseDetector {
       if (
         this.confirm(
           'down',
-          down && Math.min(current.left, current.right) >= 12,
+          down && Math.min(current.left, current.right) >= 18,
           at,
           dwell('descending')
         )

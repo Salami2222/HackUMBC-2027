@@ -8,45 +8,33 @@ export const FORM_LABELS: Record<FormRating, string> = {
   unknown: 'Insufficient data',
 };
 // Engineering defaults for the measured-movement profile, not clinical risk thresholds.
-export const FORM_PROFILE = 'measured-movement-v2';
+export const FORM_PROFILE = 'measured-movement-v3';
 export const UNASSESSED =
-  'Knee collapse, hip / spine posture, heel contact, foot pressure, load and core bracing are not assessed.';
+  'Rep speed and foot position are not scored. Knee collapse, hip / spine posture, heel contact, foot pressure, load and core bracing are not assessed.';
 export const GROUPS = [
   {
     id: 'symmetry',
     label: 'Knee symmetry',
-    weight: 25,
+    weight: 35,
     critical: true,
     cue: 'Aim for both knees to bend and straighten together.',
   },
   {
     id: 'torso',
     label: 'Torso control',
-    weight: 20,
+    weight: 30,
     critical: true,
     cue: 'Keep your chest from tipping sideways or dropping further as you rise.',
   },
-  {
-    id: 'control',
-    label: 'Lowering control',
-    weight: 20,
-    critical: true,
-    cue: 'Try a smoother, more controlled lowering phase.',
-  },
+
   {
     id: 'depth',
     label: 'Depth target',
-    weight: 20,
+    weight: 30,
     critical: false,
     cue: 'Review the depth trace against the configured 98° knee-bend target.',
   },
-  {
-    id: 'feet',
-    label: 'Foot orientation',
-    weight: 10,
-    critical: true,
-    cue: 'Review foot rolling and ankle asymmetry; check foot straps before the next set.',
-  },
+
   {
     id: 'head',
     label: 'Head control',
@@ -196,16 +184,11 @@ export function evaluateFormRep(
   const peak = (keys: string[], f: (s: FormSample) => number) =>
     Math.max(0, ...samples.filter((s) => has(s, keys)).map(f));
   const windows = samples.map((_, i) => motionWindow(samples, i));
-  const kneeSpeed = (i: number) => windows[i].speed;
   const gap = peak(['leftKnee', 'rightKnee'], (s) =>
     Math.abs(num(s, 'leftKnee') - num(s, 'rightKnee'))
   );
   const roll = peak(['chestRoll'], (s) => Math.abs(num(s, 'chestRoll')));
   const head = peak(['headInclination'], (s) => Math.abs(num(s, 'headInclination')));
-  const footRoll = peak(['leftFootRoll', 'rightFootRoll'], (s) =>
-    Math.max(Math.abs(num(s, 'leftFootRoll')), Math.abs(num(s, 'rightFootRoll')))
-  );
-  const lowering = Math.max(0, ...samples.map((_, i) => kneeSpeed(i) ?? 0));
   const riseDrops = samples.map((s, i) => {
     const { previous, speed } = windows[i];
     return speed != null &&
@@ -215,9 +198,6 @@ export function evaluateFormRep(
       ? Math.max(0, Math.abs(s.values.chestTilt) - Math.abs(previous.values.chestTilt))
       : 0;
   });
-  const ankleGap = peak(['leftAnkle', 'rightAnkle'], (s) =>
-    Math.abs(num(s, 'leftAnkle') - num(s, 'rightAnkle'))
-  );
   const headRoll = peak(['headRoll'], (s) => Math.abs(num(s, 'headRoll')));
   const headTurn = peak(['headTurn'], (s) => Math.abs(num(s, 'headTurn')));
 
@@ -242,37 +222,10 @@ export function evaluateFormRep(
       }),
       evidence: `Peak sideways chest tilt ${roll.toFixed(1)}°; extra chest drop while rising ${Math.max(...riseDrops).toFixed(1)}°`,
     },
-    control: {
-      ...sustained(samples, (s, i) => {
-        if (!has(s, ['leftKnee', 'rightKnee'])) return null;
-        const speed = kneeSpeed(i);
-        // Fast ascent and a deliberate pause are not automatically poor form.
-        return speed == null ? 0 : excess(speed, 140, 260);
-      }),
-      evidence: `Peak filtered lowering speed ${lowering.toFixed(0)}°/s`,
-    },
     depth: {
       ...sustained(samples, (s) => (has(s, ['leftKnee', 'rightKnee']) ? 0 : null)),
       severity: depth >= 98 ? 0 : Math.sqrt(clamp((98 - depth) / 38)),
       evidence: `Bilateral knee bend ${depth.toFixed(1)}° / 98° target`,
-    },
-    feet: {
-      ...sustained(samples, (s) =>
-        has(s, ['leftFootRoll', 'rightFootRoll', 'leftAnkle', 'rightAnkle'])
-          ? Math.max(
-              excess(
-                Math.max(
-                  Math.abs(num(s, 'leftFootRoll')),
-                  Math.abs(num(s, 'rightFootRoll'))
-                ),
-                12,
-                28
-              ),
-              excess(Math.abs(num(s, 'leftAnkle') - num(s, 'rightAnkle')), 15, 35)
-            )
-          : null
-      ),
-      evidence: `Peak foot roll ${footRoll.toFixed(1)}°; ankle difference ${ankleGap.toFixed(1)}°. Contact is unknown.`,
     },
     head: {
       ...sustained(samples, (s) =>
@@ -323,7 +276,7 @@ export function evaluateFormRep(
 }
 
 export interface FormReview {
-  schema: 'form-summary-v1';
+  schema: 'form-summary-v2';
   rep: number;
   at: number;
   stage: 'ascent' | 'late-ascent';
@@ -366,12 +319,6 @@ export function summarizeFormReview(
   };
   const windows = samples.map((_, i) => motionWindow(samples, i));
   const speeds = windows.map((w) => w.speed);
-  const lowering = speeds.filter(
-    (v, i) => finite(v) && samples[i].phase === 'descending'
-  ) as number[];
-  const rising = speeds.filter(
-    (v, i) => finite(v) && samples[i].phase === 'ascending'
-  ) as number[];
   const drops = samples.flatMap((s, i) => {
     const prev = windows[i].previous;
     return speeds[i] != null &&
@@ -386,7 +333,7 @@ export function summarizeFormReview(
     ? Math.max(...knees.map((s) => Math.min(s.values.leftKnee!, s.values.rightKnee!)))
     : null;
   return {
-    schema: 'form-summary-v1',
+    schema: 'form-summary-v2',
     rep: assessment.rep,
     at: last.at,
     stage:
@@ -430,12 +377,6 @@ export function summarizeFormReview(
         : null,
       chestForwardTiltPeakDeg: extreme('chestTilt'),
       chestDropDuringRisePeakDeg: drops.length ? round(Math.max(...drops)) : null,
-      loweringSpeedPeakDegPerSec: lowering.length
-        ? round(Math.max(0, ...lowering))
-        : null,
-      risingSpeedPeakDegPerSec: rising.length
-        ? round(Math.max(0, ...rising.map((v) => -v)))
-        : null,
       headUpPeakDeg: extreme('headInclination', 'max'),
       headDownPeakDeg: extreme('headInclination', 'min'),
       headOutside35Ms: values('headInclination').length
@@ -447,9 +388,6 @@ export function summarizeFormReview(
         : null,
       headRollPeakDeg: extreme('headRoll'),
       headTurnPeakDeg: extreme('headTurn'),
-      leftFootRollPeakDeg: extreme('leftFootRoll'),
-      rightFootRollPeakDeg: extreme('rightFootRoll'),
-      ankleDifferencePeakDeg: gap('leftAnkle', 'rightAnkle'),
     },
     groups: assessment.groups.map(({ id, coverage, severity, issueMs }) => ({
       id,

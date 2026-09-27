@@ -1,4 +1,4 @@
-import { BodyPart, TrackerDataT, TrackerStatus } from 'solarxr-protocol';
+import { BodyPart, ResetType, TrackerDataT, TrackerStatus } from 'solarxr-protocol';
 import { Euler, Quaternion, Vector3 } from 'three';
 
 export const CORE_ROLES = [
@@ -12,6 +12,7 @@ export const CORE_ROLES = [
   { part: BodyPart.RIGHT_FOOT, label: 'Right foot' },
 ] as const;
 export const FRESH_MS = 1000;
+export const ORIENTATION_IDLE_MS = 60000;
 const HOLD_MS = 3000;
 const MAX_CAPTURE_GAP_MS = 350;
 const STILL_DEGREES = 3;
@@ -303,6 +304,7 @@ export class MeasurementEngine {
   private receivedAt = 0;
   private connected = false;
   private signature = '';
+  private lastReadyAt = 0;
   private orientedSignature: string | null = null;
   private reference: Reference | null = null;
   private capture: {
@@ -316,8 +318,8 @@ export class MeasurementEngine {
     if (this.connected === connected) return;
     this.connected = connected;
     this.receivedAt = 0;
-    this.invalidate(
-      'Connection changed. Run auto-orientation and capture a new reference.'
+    this.invalidateReference(
+      'Connection changed. Capture a new upright reference when tracking returns.'
     );
   }
 
@@ -328,6 +330,30 @@ export class MeasurementEngine {
     this.reference = null;
     this.capture = null;
     this.message = message;
+  }
+
+  invalidateReference(
+    message = 'Upright pose reset. Capture a new upright reference.'
+  ) {
+    this.reference = null;
+    this.capture = null;
+    this.message = message;
+  }
+
+  resetPose(type: ResetType) {
+    if (type === ResetType.Mounting) this.invalidate();
+    else this.invalidateReference();
+  }
+
+  private expireOrientation(now: number) {
+    if (
+      this.orientedSignature != null &&
+      this.lastReadyAt &&
+      now - this.lastReadyAt > ORIENTATION_IDLE_MS
+    )
+      this.invalidate(
+        'Nodes have been unavailable for over a minute. Run auto-orientation and capture a reference.'
+      );
   }
 
   confirmOrientation(now: number) {
@@ -357,6 +383,7 @@ export class MeasurementEngine {
   }
 
   ingest(trackers: TrackerDataT[], now: number) {
+    this.expireOrientation(now);
     const signature = assignmentSignature(trackers);
     if (signature !== this.signature) {
       this.signature = signature;
@@ -366,6 +393,8 @@ export class MeasurementEngine {
     }
     this.trackers = trackers;
     this.receivedAt = now;
+    if (inspectRoles(trackers, now, now, this.connected).every((role) => !role.reason))
+      this.lastReadyAt = now;
     if (!this.capture) return;
     const roles = inspectRoles(trackers, now, now, this.connected);
     if (
@@ -438,6 +467,7 @@ export class MeasurementEngine {
   }
 
   state(now: number): MeasurementState {
+    this.expireOrientation(now);
     const roles = inspectRoles(this.trackers, this.receivedAt, now, this.connected);
     if (
       this.capture &&

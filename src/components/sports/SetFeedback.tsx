@@ -5,7 +5,7 @@ import { FORM_LABELS, UNASSESSED, FormRep } from '@/exercise/form-quality';
 import './SetFeedback.scss';
 
 export function SetFeedback() {
-  const { formReps, endedAt } = useSquatSession();
+  const { feedbackReps: formReps, endedAt } = useSquatSession();
   return endedAt && formReps.length ? (
     <Link className="feedback-trigger" to="/feedback">
       Set feedback
@@ -14,7 +14,7 @@ export function SetFeedback() {
 }
 
 export function SetFeedbackNavigation() {
-  const { endedAt, formReps } = useSquatSession();
+  const { endedAt, feedbackReps: formReps } = useSquatSession();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const previous = useRef(endedAt);
@@ -150,7 +150,7 @@ export function RepBreakdown({ rep }: { rep: FormRep }) {
 }
 
 export function FeedbackDashboard() {
-  const { formReps, formSummary, endedAt } = useSquatSession();
+  const { feedbackReps: formReps, formSummary, endedAt } = useSquatSession();
   const rated = formReps.filter((r) => r.score != null);
   if (!endedAt || !formReps.length)
     return (

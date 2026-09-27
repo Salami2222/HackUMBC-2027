@@ -18,18 +18,13 @@ export const metricKeys = [
   'chestSideTiltOver10Ms',
   'chestForwardTiltPeakDeg',
   'chestDropDuringRisePeakDeg',
-  'loweringSpeedPeakDegPerSec',
-  'risingSpeedPeakDegPerSec',
   'headUpPeakDeg',
   'headDownPeakDeg',
   'headOutside35Ms',
   'headRollPeakDeg',
   'headTurnPeakDeg',
-  'leftFootRollPeakDeg',
-  'rightFootRollPeakDeg',
-  'ankleDifferencePeakDeg',
 ];
-const ids = ['symmetry', 'torso', 'control', 'depth', 'feet', 'head'];
+const ids = ['symmetry', 'torso', 'depth', 'head'];
 const factors = ids.filter((id) => id !== 'depth');
 const unit = (v) => Number.isFinite(v) && v >= 0 && v <= 1;
 const exact = (o, keys) =>
@@ -49,7 +44,7 @@ export function validFormReview(b) {
       'metrics',
       'groups',
     ]) &&
-    b.schema === 'form-summary-v1' &&
+    b.schema === 'form-summary-v2' &&
     ['ascent', 'late-ascent'].includes(b.stage) &&
     b.reference === 'upright-relative' &&
     Number.isInteger(b.rep) &&
@@ -97,9 +92,6 @@ const rubrics = {
     'Bilateral knee-bend asymmetry: 12 degrees begins the deviation range, 30 is substantial. This does not measure inward knee collapse.',
   torso:
     'Sideways chest tilt: 10 to 25 degrees. Additional chest drop of 8 to 20 degrees over approximately 300ms while knees extend is relevant. Ordinary forward lean alone is not an issue.',
-  control:
-    'Lowering speed from 140 to 260 degrees per second is the configured deviation range. Fast ascent and a deliberate pause alone are not issues. Phase durations are observed portions, not precise anatomical event timings.',
-  feet: 'Foot roll from 12 to 28 degrees and ankle asymmetry from 15 to 35 degrees. Cannot infer pressure, heel lift, floor contact, or balance from these values.',
   head: 'Head inclination outside plus/minus 35 degrees begins the deviation range; 55 is substantial. Sideways roll 15 to 35 degrees and head/chest turn 30 to 60. Never move the 35-degree target or treat a brief spike as sustained.',
 };
 export function formRequest(body) {
@@ -112,7 +104,7 @@ export function formRequest(body) {
       units:
         'Angles are degrees relative to the upright reference; time is milliseconds; knee bend is zero upright. Null is unknown, never zero.',
       limitations:
-        'Ascent partial rep, not yet Ready. Only summarized estimated movement is available. No raw samples. Coverage is usable-data fraction, not probability. These are experimental targets, not injury predictions. Do not infer hip/spine posture, inward knee collapse, foot pressure, load or bracing. Peaks alone do not establish sustained problems; issueMs is accumulated time in runs of at least 350ms. Measured severities use a square-root ramp after persistence filtering so moderate deviations contribute. No independent sensor corroboration is available.',
+        'Ascent partial rep, not yet Ready. Only summarized estimated movement is available. No raw samples. Coverage is usable-data fraction, not probability. These are experimental targets, not injury predictions. Rep speed, tempo and foot position are excluded from scoring. Do not infer them or penalize phase durations. Do not infer hip/spine posture, inward knee collapse, foot pressure, load or bracing. Peaks alone do not establish sustained problems; issueMs is accumulated time in runs of at least 350ms. Measured severities use a square-root ramp after persistence filtering so moderate deviations contribute. No independent sensor corroboration is available.',
       depthTargetDeg: 98,
       headInclinationLimitDeg: 35,
       metrics: Object.fromEntries(metricKeys.map((k) => [k, body.metrics[k]])),

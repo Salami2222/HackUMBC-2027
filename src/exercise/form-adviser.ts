@@ -10,7 +10,7 @@ export interface FormAdvice {
     { severity: number; confidence: number; probability: number; uncertain: boolean }
   >;
 }
-const factorIds = ['symmetry', 'torso', 'control', 'feet', 'head'];
+const factorIds = ['symmetry', 'torso', 'head'];
 export function validFormAdvice(value: FormAdvice): boolean {
   return (
     !!value &&

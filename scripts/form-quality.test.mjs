@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  GROUPS,
   evaluateFormRep,
   FormAnalyzer,
   summarizeForm,
@@ -48,7 +49,6 @@ test('each single family is capped and cannot trigger needs attention', () => {
     () => ({ headInclination: 80 }),
     () => ({ chestRoll: 35 }),
     (_, bend) => ({ leftKnee: bend + 40 }),
-    () => ({ leftFootRoll: 50 }),
   ]) {
     const r = assess(change);
     assert.equal(r.rating, 'suboptimal');
@@ -71,9 +71,9 @@ test('correlated head metrics stay within the head group cap', () => {
   assert.equal(one.score, three.score);
   assert.equal(three.rating, 'suboptimal');
 });
-test('missing or corrupt foot data is unknown, never zero or optimal', () => {
+test('missing or corrupt head data is unknown, never zero or optimal', () => {
   for (const value of [null, undefined, NaN, Infinity]) {
-    const r = assess(() => ({ leftFootRoll: value }));
+    const r = assess(() => ({ headInclination: value }));
     assert.equal(r.score, null);
     assert.equal(r.rating, 'unknown');
   }
@@ -118,18 +118,18 @@ test('weighted scores remain numeric contributions, independent of rating gates'
   assert.equal(head.score, 95);
   assert.equal(head.rating, 'suboptimal');
   const torso = assess(() => ({ chestRoll: 35 }));
-  assert.equal(torso.score, 80);
+  assert.equal(torso.score, 70);
 });
 
 test('persistent modest deviations deduct points without moving the configured head or depth targets', () => {
   const r = assess((_, bend) => ({ leftKnee: bend + 16, chestRoll: 13 }), 90);
-  assert.ok(r.score < 80 && r.score > 60, `score ${r.score}`);
+  assert.ok(r.score < 80 && r.score > 50, `score ${r.score}`);
   assert.equal(r.rating, 'suboptimal');
   assert.ok(assess(() => ({ headInclination: 37 })).score < 99);
   assert.equal(assess(() => ({ headInclination: 35 })).score, 100);
 });
 
-test('lowering speed and chest drop are measured consistently at 10 through 100 Hz', () => {
+test('chest drop is measured consistently at 10 through 100 Hz', () => {
   const results = [];
   for (const hz of [10, 20, 30, 60, 100]) {
     const samples = Array.from({ length: hz * 3 + 1 }, (_, i) => {
@@ -148,9 +148,7 @@ test('lowering speed and chest drop are measured consistently at 10 through 100 
       };
     });
     const r = evaluateFormRep(samples, 1, 108, 4000);
-    const control = r.groups.find((g) => g.id === 'control');
     const torso = r.groups.find((g) => g.id === 'torso');
-    assert.ok(control.severity > 0.45, `${hz} Hz control ${control.severity}`);
     assert.ok(torso.severity > 0.8, `${hz} Hz torso ${torso.severity}`);
     results.push(r.score);
   }
@@ -158,4 +156,37 @@ test('lowering speed and chest drop are measured consistently at 10 through 100 
     Math.max(...results) - Math.min(...results) < 3,
     results.join(', ')
   );
+});
+
+test('four active weights total 100 and foot values cannot affect coverage or score', () => {
+  assert.deepEqual(
+    GROUPS.map((g) => [g.id, g.weight]),
+    [
+      ['symmetry', 35],
+      ['torso', 30],
+      ['depth', 30],
+      ['head', 5],
+    ]
+  );
+  assert.equal(
+    GROUPS.reduce((sum, g) => sum + g.weight, 0),
+    100
+  );
+  for (const value of [null, undefined, NaN, 90]) {
+    const r = assess(() => ({
+      leftFootRoll: value,
+      rightFootRoll: value,
+      leftAnkle: value,
+      rightAnkle: value,
+    }));
+    assert.equal(r.score, 100);
+    assert.equal(r.coverage, 1);
+  }
+});
+test('rapid lowering alone no longer deducts points', () => {
+  const samples = frames((i) => ({
+    leftKnee: i < 10 ? i * 20 : 100,
+    rightKnee: i < 10 ? i * 20 : 100,
+  }));
+  assert.equal(evaluateFormRep(samples, 1, 100, 9100).score, 100);
 });

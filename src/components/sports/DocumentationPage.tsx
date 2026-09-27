@@ -13,20 +13,10 @@ const ranges: Record<string, { range: string; meaning: string }> = {
     meaning:
       'Also checks an extra 8–20° chest drop over about 300 ms while rising. Ordinary forward lean is allowed.',
   },
-  control: {
-    range: '140–260°/s lowering',
-    meaning:
-      'Filtered knee-bend speed on the way down. Fast ascent and deliberate pauses are not penalized on their own.',
-  },
   depth: {
     range: '98° knee bend',
     meaning:
       'Both legs must reach the target together. Standing straight is 0°; deeper bends have no upper cutoff in this rule.',
-  },
-  feet: {
-    range: '12–28° foot roll',
-    meaning:
-      'Also checks 15–35° left/right ankle-angle difference. Foot pressure and heel contact are unknown.',
   },
   head: {
     range: '±35° up / down',
@@ -83,7 +73,10 @@ export function DocumentationPage() {
               In <Link to="/calibration">Sensor Calibration</Link>, follow the
               upright reset and ski-pose instructions. Each node receives its
               own mounting correction. Check that the displayed pose follows
-              you.
+              you. Upright reset keeps this mounting correction; capture a new
+              reference afterwards. Repeat auto-orient after moving a strap,
+              changing assignments, or losing required tracking for over a
+              minute.
             </p>
           </li>
           <li>
@@ -113,12 +106,12 @@ export function DocumentationPage() {
           <li>
             <strong>Ready</strong>
             <span>
-              Both knees at 0–10° bend. Stand steady initially to start.
+              Both knees at 0–15° bend. Stand steady initially to start.
             </span>
           </li>
           <li>
             <strong>Descending</strong>
-            <span>Both knees bend increasingly, past 12°.</span>
+            <span>Both knees bend increasingly, to at least 18°.</span>
           </li>
           <li>
             <strong>Bottom</strong>
@@ -143,13 +136,14 @@ export function DocumentationPage() {
           0.5 seconds discards the unfinished rep.
         </p>
         <p>
-          Start an eight-rep set from{' '}
+          Choose a three-rep Form Test or eight-rep Working Set from{' '}
           <Link to="/presentation">Presentation</Link>. Each score appears at
           Ready and stays fixed in its equally spaced graph slot. A counted rep
           can still miss the depth target. After the set,{' '}
           <Link to="/feedback">Feedback</Link> shows repeated issues and
-          improvement cues. Tracking’s optional three-rep baseline is separate;
-          Presentation does not need it.
+          improvement cues and each rep’s weighted breakdown. Both modes use the
+          same four factors, targets and Jev review. Neither requires a baseline
+          or passing the other mode.
         </p>
       </section>
 
@@ -190,8 +184,8 @@ export function DocumentationPage() {
           Ranges run from the start of a penalty to its full severity. Movement
           deviations must persist for 350 ms beyond a small noise margin; a
           brief spike does not become a flag. A square-root penalty ramp gives
-          moderate sustained deviations meaningful weight. Speed uses a 300 ms
-          time window, independent of sensor frame rate. Depth uses the
+          moderate sustained deviations meaningful weight. Rep speed and foot
+          position are excluded from scoring and Jev review. Depth uses the
           completed rep’s peak bend instead. These are current experimental
           targets, not universal lifting standards.
         </p>
@@ -214,9 +208,9 @@ export function DocumentationPage() {
           <article className="docs-attention">
             <h3>Needs attention</h3>
             <p>
-              Measured score below 65, plus at least two control factors at 65%
-              severity or higher: knee symmetry, torso, lowering control or
-              feet. Head or depth alone cannot trigger this rating.
+              Measured score below 65, with both knee symmetry and torso at 65%
+              severity or higher. Head or depth alone cannot trigger this
+              rating.
             </p>
           </article>
         </div>
@@ -233,7 +227,7 @@ export function DocumentationPage() {
           <h2 id="docs-jev-title">Where Jev contributes</h2>
         </div>
         <p>
-          For form scoring, Jev reviews 27 curated values and six factor
+          For form scoring, Jev reviews 22 curated values and four factor
           summaries during ascent, with a second opportunity near the
           end—angles, durations, asymmetry and control—not the raw tracker
           stream. It can interpret patterns within the measured factors; the 98°

@@ -250,12 +250,12 @@ for (const hz of [10, 20, 40])
     assert.equal(r.reps.length, 8);
   });
 
-test('top-out uses the 0–10 degree band without requiring low velocity', () => {
+test('top-out uses the 0–15 degree band without requiring low velocity', () => {
   const r = rig({ hz: 20 });
   r.hold(0, 1);
   r.ramp(100, 1.5);
-  r.ramp(8, 1.5);
-  r.sample(9);
+  r.ramp(13, 1.5);
+  r.sample(14);
   assert.equal(r.reps.length, 1);
   assert.equal(r.detector.state.phase, 'ready');
   assert.ok(r.detector.state.kneeSpeed < -5);
@@ -277,13 +277,13 @@ test('stationary knees above the top band do not count, and small top jitter cou
   const r = rig({ hz: 20 });
   r.hold(0, 1);
   r.ramp(100, 1.5);
-  r.ramp(15, 1.5);
-  r.hold(15, 1);
+  r.ramp(20, 1.5);
+  r.hold(20, 1);
   assert.equal(r.reps.length, 0);
-  r.sample(9);
-  r.sample(11);
-  r.sample(9);
+  r.sample(14);
+  r.sample(16);
+  r.sample(14);
   assert.equal(r.reps.length, 1);
-  r.hold(9, 1, 2);
+  r.hold(14, 1, 2);
   assert.equal(r.reps.length, 1);
 });

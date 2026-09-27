@@ -5,13 +5,19 @@ import {
   useEffect,
   useState,
 } from 'react';
-import { DataFeedMessage, DataFeedUpdateT, RpcMessage } from 'solarxr-protocol';
+import {
+  DataFeedMessage,
+  DataFeedUpdateT,
+  RpcMessage,
+  ResetResponseT,
+} from 'solarxr-protocol';
 import { useWebsocketAPI } from '@/hooks/websocket-api';
 import { MeasurementEngine, MeasurementState } from './measurements';
 
 type MeasurementContextValue = MeasurementState & {
   confirmOrientation: () => void;
   invalidate: () => void;
+  invalidateReference: () => void;
   captureReference: () => void;
   cancelReference: () => void;
 };
@@ -46,8 +52,8 @@ export function MeasurementProvider({ children }: { children: ReactNode }) {
     }
   );
 
-  useRPCPacket(RpcMessage.ResetResponse, () => {
-    engine.invalidate();
+  useRPCPacket(RpcMessage.ResetResponse, (response: ResetResponseT) => {
+    engine.resetPose(response.resetType);
     publish();
   });
 
@@ -65,6 +71,10 @@ export function MeasurementProvider({ children }: { children: ReactNode }) {
         },
         invalidate: () => {
           engine.invalidate();
+          publish();
+        },
+        invalidateReference: () => {
+          engine.invalidateReference();
           publish();
         },
         captureReference: () => {
