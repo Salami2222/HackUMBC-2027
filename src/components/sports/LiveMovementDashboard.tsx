@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAtomValue } from 'jotai';
-import { Link } from 'react-router-dom';
 import {
   AssignTrackerRequestT,
   BodyPart,
@@ -33,7 +32,7 @@ import {
   nodeHardwareName,
 } from './node-positions';
 
-export function LiveMovementDashboard() {
+export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
   const { isConnected, sendRPCPacket, useDataFeedPacket } = useWebsocketAPI();
   const trackers = useAtomValue(flatTrackersAtom).filter(
     ({ tracker }) => tracker.info?.isImu && !tracker.info.isComputed
@@ -190,74 +189,148 @@ export function LiveMovementDashboard() {
   };
 
   return (
-    <div className="sports-app">
-      <header className="sports-header">
-        <div className="sports-brand">
-          <div className="brand-mark">
-            M<span>•</span>
-          </div>
-          <div>
-            <strong>MOTIONLAB</strong>
-            <small>PERFORMANCE ANALYSIS</small>
-          </div>
+    <main className="sports-content calibration-screen">
+      <div className="tracking-intro">
+        <div>
+          <span className="eyebrow">Body nodes / live hardware</span>
+          <h1>Sensor Calibration</h1>
         </div>
-        <div className="sports-header-center">Movement intelligence</div>
-        <div className="sports-header-right">
-          <span className={fresh && assignedOnline.length ? 'live-dot' : ''} />
-          {fresh && assignedOnline.length
-            ? 'LIVE NODES'
-            : 'LIVE MODE / WAITING'}
-          <Link to="/demo">DEMO</Link>
+        <div className="calibration-top-actions">
+          <button
+            className="secondary-button"
+            onClick={() => setSetupOpen(!setupOpen)}
+            aria-expanded={setupOpen}
+            aria-controls="node-setup-content"
+          >
+            Connect nodes
+          </button>
+          <NodeOrientation
+            ready={fresh && assignedOnline.length > 0 && !assignmentPending}
+            nodeCount={assignedOnline.length}
+            otherResetBusy={reset.status === 'counting'}
+          />
         </div>
-      </header>
-      <main className="sports-content">
-        <div className="sports-heading">
-          <div>
-            <div className="eyebrow">HARDWARE SESSION / BODY NODES</div>
-            <h1>Movement overview</h1>
-            <p>Your movement, connected.</p>
+      </div>
+      <div className="calibration-layout">
+        <section
+          className="calibration-controls"
+          aria-label="Calibrate a sensor"
+        >
+          <p className="calibration-lead">
+            Connect your nodes, assign each to its body position, then use
+            Auto-orient trackers to calibrate how they are worn.
+          </p>
+          <div className="calibration-status" role="status">
+            <i className={live ? 'is-running' : ''} />
+            <span>{status}</span>
           </div>
-          <div className="sports-controls">
-            <NodePicker
-              label="Node"
-              disabled={!!assignmentPending}
-              value={selectedId}
-              placeholder={
-                trackers.length ? 'Choose a node' : 'No nodes added yet'
-              }
-              onChange={(value) => {
-                setSelectedKey(value);
-                setAssignment(null);
-                setDraft(null);
-                setCalibrationMessage('');
-              }}
-              options={trackers.map(({ tracker }) => ({
-                value: nodeKey(tracker),
-                label: nodeLabel(tracker),
-                detail: `${nodeHardwareName(tracker)} · ${
-                  !fresh
-                    ? 'Offline'
-                    : tracker.status === TrackerStatus.OK
-                      ? 'Online'
-                      : tracker.status === TrackerStatus.BUSY
-                        ? 'Starting'
-                        : tracker.status === TrackerStatus.ERROR
-                          ? 'Needs attention'
-                          : 'Offline'
-                }`,
-              }))}
-            />
+          <NodePicker
+            label="Node"
+            disabled={!!assignmentPending}
+            value={selectedId}
+            placeholder={
+              trackers.length ? 'Choose a node' : 'No nodes added yet'
+            }
+            onChange={(value) => {
+              setSelectedKey(value);
+              setAssignment(null);
+              setDraft(null);
+              setCalibrationMessage('');
+            }}
+            options={trackers.map(({ tracker }) => ({
+              value: nodeKey(tracker),
+              label: nodeLabel(tracker),
+              detail: `${nodeHardwareName(tracker)} · ${
+                !fresh
+                  ? 'Offline'
+                  : tracker.status === TrackerStatus.OK
+                    ? 'Online'
+                    : tracker.status === TrackerStatus.BUSY
+                      ? 'Starting'
+                      : tracker.status === TrackerStatus.ERROR
+                        ? 'Needs attention'
+                        : 'Offline'
+              }`,
+            }))}
+          />
+
+          <section
+            ref={assignmentPanel}
+            className="node-assignment"
+            aria-label="Body position assignment"
+          >
+            <div className="node-assignment-controls">
+              <NodePicker
+                label="Body position"
+                value={String(targetPart)}
+                placeholder="Choose a position"
+                disabled={!selected || !!assignmentPending}
+                onChange={(value) => {
+                  setDraft({ key: selectedId, part: Number(value) });
+                  setAssignment(null);
+                }}
+                options={[
+                  ...NODE_POSITIONS.map(({ part, label }) => ({
+                    value: String(part),
+                    label,
+                    detail: trackers.some(
+                      ({ tracker }) =>
+                        nodeKey(tracker) !== selectedId &&
+                        tracker.info?.bodyPart === part
+                    )
+                      ? 'In use'
+                      : undefined,
+                  })),
+                  { value: String(BodyPart.NONE), label: 'Unassigned' },
+                ]}
+              />
+              <button
+                className="primary-button"
+                onClick={assignPosition}
+                disabled={
+                  !fresh ||
+                  !selected ||
+                  unchanged ||
+                  !!occupied ||
+                  !!assignmentPending
+                }
+              >
+                {assignmentPending
+                  ? 'Saving…'
+                  : unchanged
+                    ? 'Assignment saved'
+                    : targetPart === BodyPart.NONE
+                      ? 'Unassign node'
+                      : 'Save assignment'}
+              </button>
+            </div>
+            <div className="node-assignment-help" role="status">
+              <strong>
+                {selected
+                  ? `${nodeLabel(selected)} · ${nodeHardwareName(selected)}`
+                  : 'Select a node to assign its position'}
+              </strong>
+              <p>
+                {occupied
+                  ? `${targetPosition?.label} is already assigned to ${nodeHardwareName(occupied)}. Unassign that node first or choose another position.`
+                  : (targetPosition?.hint ??
+                    'Remove this node from the body without disconnecting it.')}{' '}
+                Left and right refer to your own body.
+              </p>
+              {assignedConfirmation && (
+                <p>
+                  Saved. The node name and body position will be kept when it
+                  reconnects.
+                </p>
+              )}
+            </div>
+          </section>
+
+          <div className="calibration-actions">
+            {' '}
             <button
               className="secondary-button"
-              onClick={() => setSetupOpen(!setupOpen)}
-              aria-expanded={setupOpen}
-              aria-controls="node-setup-content"
-            >
-              Connect nodes
-            </button>
-            <button
-              className="secondary-button"
-              disabled={!skeletonLive || reset.disabled}
+              disabled={!fresh || !assignedOnline.length || reset.disabled}
               onClick={() => {
                 setCalibrationMessage(
                   'Stand upright and face forward while your pose resets.'
@@ -269,355 +342,227 @@ export function LiveMovementDashboard() {
                 ? `Resetting ${reset.timer}`
                 : 'Reset upright pose'}
             </button>
-            <NodeOrientation
-              ready={fresh && assignedOnline.length > 0 && !assignmentPending}
-              nodeCount={assignedOnline.length}
-              otherResetBusy={reset.status === 'counting'}
-            />
           </div>
-        </div>
-        <section
-          className="sports-panel node-manager"
-          aria-label="Node connection manager"
-        >
-          <div className="panel-top">
-            <div>
-              <span className="panel-index">CONNECTION MANAGER</span>
-              <h2>Your nodes</h2>
-            </div>
-            <span className="panel-tag">
-              {fresh ? available.length : 0} ONLINE ·{' '}
-              {fresh ? assignedOnline.length : 0} ASSIGNED ONLINE
-            </span>
-          </div>
-          <p className="node-manager-description">
-            Each row is a separate physical node. Online means it is sending
-            tracking data now. USB setup success alone does not mean a node is
-            still online.
-          </p>
-          {trackers.length === 0 ? (
-            <p className="node-manager-description">
-              No nodes detected. Open Connect nodes to set up Wi-Fi over USB.
+          {assignment && !assignedConfirmation && !assignmentPending && (
+            <p className="calibration-feedback" role="status">
+              Assignment was not confirmed. Check the connection and retry.
             </p>
-          ) : (
-            <div className="node-manager-list">
-              {[...trackers]
-                .sort(
-                  (a, b) =>
-                    Number(b.tracker.status === TrackerStatus.OK) -
-                    Number(a.tracker.status === TrackerStatus.OK)
-                )
-                .map(({ tracker, device }) => {
-                  const online = fresh && tracker.status === TrackerStatus.OK;
-                  const state =
-                    !fresh || tracker.status === TrackerStatus.DISCONNECTED
-                      ? 'Offline'
-                      : online
-                        ? 'Online'
-                        : tracker.status === TrackerStatus.BUSY
-                          ? 'Starting'
-                          : 'Not streaming';
-                  return (
-                    <div
-                      className={`node-manager-row ${nodeKey(tracker) === selectedId ? 'is-selected' : ''}`}
-                      key={nodeKey(tracker)}
-                    >
-                      <div>
-                        <strong>{nodeHardwareName(tracker)}</strong>
-                        <small>
-                          {nodeKey(tracker) === selectedId
-                            ? 'Selected node'
-                            : 'Physical node'}
-                        </small>
-                      </div>
-                      <span
-                        className={`node-state ${online ? 'is-online' : ''}`}
-                      >
-                        {state}
-                      </span>
-                      <div>
-                        <small>Body position</small>
-                        <strong>{nodeLabel(tracker)}</strong>
-                      </div>
-                      <div>
-                        <small>Data rate</small>
-                        <strong>
-                          {online && tracker.tps != null
-                            ? `${Math.round(tracker.tps)} packets/s`
-                            : '—'}
-                        </strong>
-                      </div>
-                      <NodeBattery
-                        hardware={device?.hardwareStatus}
-                        online={online}
-                      />
-                      <button
-                        className="secondary-button"
-                        aria-label={`Configure ${nodeHardwareName(tracker)}`}
-                        disabled={!!assignmentPending}
-                        onClick={() => {
-                          setSelectedKey(nodeKey(tracker));
-                          setDraft(null);
-                          setAssignment(null);
-                          setCalibrationMessage('');
-                          assignmentPanel.current?.scrollIntoView({
-                            behavior: 'smooth',
-                            block: 'center',
-                          });
-                        }}
-                      >
-                        Configure
-                      </button>
-                    </div>
-                  );
-                })}
-            </div>
           )}
-        </section>
-        <section
-          ref={assignmentPanel}
-          className="sports-panel node-assignment"
-          aria-label="Body position assignment"
-        >
-          <div className="node-assignment-controls">
-            <NodePicker
-              label="Body position"
-              value={String(targetPart)}
-              placeholder="Choose a position"
-              disabled={!selected || !!assignmentPending}
-              onChange={(value) => {
-                setDraft({ key: selectedId, part: Number(value) });
-                setAssignment(null);
-              }}
-              options={[
-                ...NODE_POSITIONS.map(({ part, label }) => ({
-                  value: String(part),
-                  label,
-                  detail: trackers.some(
-                    ({ tracker }) =>
-                      nodeKey(tracker) !== selectedId &&
-                      tracker.info?.bodyPart === part
-                  )
-                    ? 'In use'
-                    : undefined,
-                })),
-                { value: String(BodyPart.NONE), label: 'Unassigned' },
-              ]}
-            />
-            <button
-              className="primary-button"
-              onClick={assignPosition}
-              disabled={
-                !fresh ||
-                !selected ||
-                unchanged ||
-                !!occupied ||
-                !!assignmentPending
-              }
-            >
-              {assignmentPending
-                ? 'Saving…'
-                : unchanged
-                  ? 'Assignment saved'
-                  : targetPart === BodyPart.NONE
-                    ? 'Unassign node'
-                    : 'Save assignment'}
-            </button>
-          </div>
-          <div className="node-assignment-help" role="status">
-            <strong>
-              {selected
-                ? `${nodeLabel(selected)} · ${nodeHardwareName(selected)}`
-                : 'Select a node to assign its position'}
-            </strong>
-            <p>
-              {occupied
-                ? `${targetPosition?.label} is already assigned to ${nodeHardwareName(occupied)}. Unassign that node first or choose another position.`
-                : (targetPosition?.hint ??
-                  'Remove this node from the body without disconnecting it.')}{' '}
-              Left and right refer to your own body.
+          {calibrationMessage && (
+            <p className="calibration-feedback" role="status">
+              {calibrationMessage}
             </p>
-            {assignedConfirmation && (
-              <p>
-                Saved. The node name and body position will be kept when it
-                reconnects.
-              </p>
+          )}
+          <div className="sensor-readout">
+            <span>
+              {fresh ? available.length : 0} nodes online ·{' '}
+              {fresh ? assignedOnline.length : 0} assigned online
+            </span>
+            {angles && (
+              <span data-testid="node-orientation">
+                {position?.label} · pitch {angles.x.toFixed(1)}° · yaw{' '}
+                {angles.y.toFixed(1)}° · roll {angles.z.toFixed(1)}°
+              </span>
             )}
           </div>
+          <p className="calibration-footnote">
+            The skeleton uses all assigned online nodes. Missing segments are
+            estimated. Live orientation is not a joint angle or lifting score;
+            the Tracking tab uses a separate simulated exercise stream.
+          </p>
         </section>
-        <NodeSetup open={setupOpen} onToggle={() => setSetupOpen(!setupOpen)} />
-        {unassignedOnline.length > 0 && (
-          <section
-            className="live-connection-note node-assignment-notice"
-            aria-label="Nodes awaiting assignment"
-          >
-            <strong>Online nodes awaiting a body position</strong>
-            <p>
-              These nodes are sending data but will not drive the skeleton until
-              assigned. Each node has its own saved position.
-            </p>
-            <div>
-              {unassignedOnline.map(({ tracker }) => (
-                <button
-                  key={nodeKey(tracker)}
-                  className="secondary-button"
-                  disabled={
-                    !!assignmentPending || nodeKey(tracker) === selectedId
-                  }
-                  onClick={() => {
-                    setSelectedKey(nodeKey(tracker));
-                    setDraft(null);
-                    setAssignment(null);
-                    setCalibrationMessage('');
-                  }}
-                >
-                  {nodeKey(tracker) === selectedId ? 'Selected' : 'Select'}{' '}
-                  {nodeHardwareName(tracker)}
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-        <div className="live-connection-note" role="status">
-          <strong>{status}.</strong>{' '}
-          {live
-            ? 'The selected node measures orientation. The skeleton combines your assigned nodes with estimated segments.'
-            : 'Turn on your node and connect to the same Wi-Fi as this computer. Use Connect nodes for first-time setup.'}
-          {assignment && !assignedConfirmation && !assignmentPending && (
-            <p>Assignment was not confirmed. Check the connection and retry.</p>
-          )}
-          {calibrationMessage && <p>{calibrationMessage}</p>}
-        </div>
-        <section className="sports-hero">
-          <div className="sports-panel viewport-panel">
-            <div className="panel-top">
-              <div>
-                <span className="panel-index">01 / LIVE MOVEMENT</span>
-                <h2>Skeleton tracking</h2>
-              </div>
-              <span className="panel-tag">MOVEMENT VIEW</span>
-            </div>
-            <div className="sports-viewport">
-              {skeletonLive ? (
-                <SkeletonVisualizerWidget
-                  onInit={(context) => {
-                    view.current =
-                      context.addView({
-                        left: 0,
-                        bottom: 0,
-                        width: 1,
-                        height: 1,
-                        position: new Vector3(2.5, 1.9, -2.8),
-                        onHeightChange(v, height) {
-                          v.controls.target.set(0, height / 2.2, 0);
-                          v.camera.zoom = 1 / (Math.max(1, height) / 1.55);
-                          v.camera.updateProjectionMatrix();
-                        },
-                      }) ?? null;
-                  }}
-                />
-              ) : (
-                <div className="live-empty-state">
-                  <h3>{status}</h3>
-                  <p>No simulated movement is shown in live mode.</p>
-                </div>
-              )}
-              <div className="viewport-status">
-                {skeletonLive
-                  ? 'LIVE NODES / ESTIMATED SKELETON'
-                  : 'NO LIVE POSE'}
-              </div>
-            </div>
-            <div className="viewport-footer">
-              <div>
-                {fresh ? assignedOnline.length : 0} ASSIGNED /{' '}
-                {fresh ? available.length : 0} ONLINE
-              </div>
-              <div className="view-buttons">
-                <button
-                  disabled={!skeletonLive}
-                  onClick={() => setView(new Vector3(0, 1.3, -4))}
-                >
-                  FRONT
-                </button>
-                <button
-                  disabled={!skeletonLive}
-                  onClick={() => setView(new Vector3(4, 1.3, 0))}
-                >
-                  SIDE
-                </button>
-                <button
-                  disabled={!skeletonLive}
-                  onClick={() => setView(new Vector3(2.5, 1.9, -2.8))}
-                >
-                  3D
-                </button>
-              </div>
-            </div>
+        <section className="sensor-preview" aria-label="Live skeleton preview">
+          <div className="stage-title">
+            <span>Live skeleton preview</span>
+            <span>{skeletonLive ? 'LIVE' : 'NO LIVE POSE'}</span>
           </div>
-          <div className="sports-panel metrics-panel">
-            <div className="panel-top">
-              <div>
-                <span className="panel-index">
-                  02 / {position?.label.toUpperCase() ?? 'NODE'} ORIENTATION
+          <div className="sports-viewport">
+            {active && skeletonLive ? (
+              <SkeletonVisualizerWidget
+                onInit={(context) => {
+                  view.current =
+                    context.addView({
+                      left: 0,
+                      bottom: 0,
+                      width: 1,
+                      height: 1,
+                      position: new Vector3(2.5, 1.9, -2.8),
+                      onHeightChange(v, height) {
+                        v.controls.target.set(0, height / 2.2, 0);
+                        v.camera.zoom = 1 / (Math.max(1, height) / 1.55);
+                        v.camera.updateProjectionMatrix();
+                      },
+                    }) ?? null;
+                }}
+              />
+            ) : (
+              <div className="live-empty-state">
+                <strong>{status}</strong>
+                <span>
+                  Connect and calibrate a node to preview the live pose.
                 </span>
-                <h2>Live movement</h2>
               </div>
-              <span className="panel-tag">
-                {live ? 'STREAMING' : 'WAITING'}
-              </span>
-            </div>
-            <div className="metrics-grid">
-              {(['x', 'y', 'z'] as const).map((axis, index) => (
-                <div className="sports-metric" key={axis}>
-                  <span className="metric-label">
-                    {['PITCH', 'YAW', 'ROLL'][index]}
-                  </span>
-                  <div className="metric-value" data-testid={`node-${axis}`}>
-                    {angles ? angles[axis].toFixed(1) : '—'}
-                    <span>°</span>
-                  </div>
-                  <span className="metric-note">
-                    {selected?.rotationReferenceAdjusted
-                      ? 'Aligned orientation'
-                      : 'Node orientation'}
-                  </span>
-                </div>
-              ))}
-              {['KNEE ANGLES', 'REP COUNT', 'FORM SCORE'].map((label) => (
-                <div className="sports-metric" key={label}>
-                  <span className="metric-label">{label}</span>
-                  <div className="metric-value">—</div>
-                  <span className="metric-note">Not calculated yet</span>
-                </div>
-              ))}
-            </div>
-            <div className="live-measurement-note">
-              <h3>
-                {position
-                  ? `${position.label} orientation`
-                  : 'Assign your body nodes'}
-              </h3>
-              <p>
-                Attach each node at its assigned position, stand upright, then
-                reset the upright pose. These angles describe orientation, not a
-                validated lifting score.
-              </p>
-              <p>
-                The skeleton uses all assigned online nodes. Missing segments
-                are estimated; these orientation readings are not joint angles
-                or a validated lifting score.
-              </p>
+            )}
+          </div>
+          <div className="stage-footer">
+            <span>
+              {skeletonLive
+                ? `${assignedOnline.length} assigned / ${available.length} online · missing segments estimated`
+                : 'Waiting for live tracking data'}
+            </span>
+            <div className="view-buttons" aria-label="Skeleton view">
+              <button
+                disabled={!skeletonLive}
+                onClick={() => setView(new Vector3(0, 1.3, -4))}
+              >
+                Front
+              </button>
+              <button
+                disabled={!skeletonLive}
+                onClick={() => setView(new Vector3(4, 1.3, 0))}
+              >
+                Side
+              </button>
+              <button
+                disabled={!skeletonLive}
+                onClick={() => setView(new Vector3(2.5, 1.9, -2.8))}
+              >
+                3D
+              </button>
             </div>
           </div>
         </section>
-        <footer className="sports-footer">
-          MOTIONLAB / LIVE HARDWARE
-          <span>
-            {isConnected ? 'Ready for your nodes' : 'Local service offline'}
+      </div>
+      <NodeSetup open={setupOpen} onToggle={() => setSetupOpen(!setupOpen)} />
+      {unassignedOnline.length > 0 && (
+        <section
+          className="live-connection-note node-assignment-notice"
+          aria-label="Nodes awaiting assignment"
+        >
+          <strong>Online nodes awaiting a body position</strong>
+          <p>
+            These nodes are sending data but will not drive the skeleton until
+            assigned. Each node has its own saved position.
+          </p>
+          <div>
+            {unassignedOnline.map(({ tracker }) => (
+              <button
+                key={nodeKey(tracker)}
+                className="secondary-button"
+                disabled={
+                  !!assignmentPending || nodeKey(tracker) === selectedId
+                }
+                onClick={() => {
+                  setSelectedKey(nodeKey(tracker));
+                  setDraft(null);
+                  setAssignment(null);
+                  setCalibrationMessage('');
+                }}
+              >
+                {nodeKey(tracker) === selectedId ? 'Selected' : 'Select'}{' '}
+                {nodeHardwareName(tracker)}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section
+        className="sports-panel node-manager"
+        aria-label="Node connection manager"
+      >
+        <div className="panel-top">
+          <div>
+            <span className="panel-index">CONNECTION MANAGER</span>
+            <h2>Your nodes</h2>
+          </div>
+          <span className="panel-tag">
+            {fresh ? available.length : 0} ONLINE ·{' '}
+            {fresh ? assignedOnline.length : 0} ASSIGNED ONLINE
           </span>
-        </footer>
-      </main>
-    </div>
+        </div>
+        <p className="node-manager-description">
+          Each row is a separate physical node. Online means it is sending
+          tracking data now. USB setup success alone does not mean a node is
+          still online.
+        </p>
+        {trackers.length === 0 ? (
+          <p className="node-manager-description">
+            No nodes detected. Open Connect nodes to set up Wi-Fi over USB.
+          </p>
+        ) : (
+          <div className="node-manager-list">
+            {[...trackers]
+              .sort(
+                (a, b) =>
+                  Number(b.tracker.status === TrackerStatus.OK) -
+                  Number(a.tracker.status === TrackerStatus.OK)
+              )
+              .map(({ tracker, device }) => {
+                const online = fresh && tracker.status === TrackerStatus.OK;
+                const state =
+                  !fresh || tracker.status === TrackerStatus.DISCONNECTED
+                    ? 'Offline'
+                    : online
+                      ? 'Online'
+                      : tracker.status === TrackerStatus.BUSY
+                        ? 'Starting'
+                        : 'Not streaming';
+                return (
+                  <div
+                    className={`node-manager-row ${nodeKey(tracker) === selectedId ? 'is-selected' : ''}`}
+                    key={nodeKey(tracker)}
+                  >
+                    <div>
+                      <strong>{nodeHardwareName(tracker)}</strong>
+                      <small>
+                        {nodeKey(tracker) === selectedId
+                          ? 'Selected node'
+                          : 'Physical node'}
+                      </small>
+                    </div>
+                    <span className={`node-state ${online ? 'is-online' : ''}`}>
+                      {state}
+                    </span>
+                    <div>
+                      <small>Body position</small>
+                      <strong>{nodeLabel(tracker)}</strong>
+                    </div>
+                    <div>
+                      <small>Data rate</small>
+                      <strong>
+                        {online && tracker.tps != null
+                          ? `${Math.round(tracker.tps)} packets/s`
+                          : '—'}
+                      </strong>
+                    </div>
+                    <NodeBattery
+                      hardware={device?.hardwareStatus}
+                      online={online}
+                    />
+                    <button
+                      className="secondary-button"
+                      aria-label={`Configure ${nodeHardwareName(tracker)}`}
+                      disabled={!!assignmentPending}
+                      onClick={() => {
+                        setSelectedKey(nodeKey(tracker));
+                        setDraft(null);
+                        setAssignment(null);
+                        setCalibrationMessage('');
+                        assignmentPanel.current?.scrollIntoView({
+                          behavior: 'smooth',
+                          block: 'center',
+                        });
+                      }}
+                    >
+                      Configure
+                    </button>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+      </section>
+    </main>
   );
 }

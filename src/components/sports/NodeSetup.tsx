@@ -333,14 +333,16 @@ export function NodeSetup({
           </form>
         </div>
       )}
-      <div className="node-setup-status" role="status">
-        {!isConnected
-          ? 'Local tracking service is offline. Start it on this computer to connect nodes.'
-          : error ||
-            (active
-              ? statusMessages[status]
-              : 'Ready. Previously configured nodes reconnect automatically.')}
-      </div>
+      {(open || active || error) && (
+        <div className="node-setup-status" role="status">
+          {!isConnected
+            ? 'Local tracking service is offline. Start it on this computer to connect nodes.'
+            : error ||
+              (active
+                ? statusMessages[status]
+                : 'Ready. Previously configured nodes reconnect automatically.')}
+        </div>
+      )}
     </section>
   );
 }
