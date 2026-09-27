@@ -8,7 +8,7 @@ export const FORM_LABELS: Record<FormRating, string> = {
   unknown: 'Insufficient data',
 };
 // Engineering defaults for the measured-movement profile, not clinical risk thresholds.
-export const FORM_PROFILE = 'measured-movement-v1';
+export const FORM_PROFILE = 'measured-movement-v2';
 export const UNASSESSED =
   'Knee collapse, hip / spine posture, heel contact, foot pressure, load and core bracing are not assessed.';
 export const GROUPS = [
@@ -86,12 +86,55 @@ export interface FormRep {
     weight: number;
     reason: string;
     summary?: FormReview;
+    attempts?: number;
+    latencyMs?: number;
+    httpStatus?: number;
+    factors?: {
+      id: string;
+      proposedSeverity: number;
+      applied: boolean;
+      reason: string;
+    }[];
   };
 }
 const clamp = (v: number) => Math.min(1, Math.max(0, v));
 const excess = (v: number, acceptable: number, severe: number) =>
   clamp((v - acceptable) / (severe - acceptable));
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+
+/** Compare by elapsed time, not frame count: feeds can run from 10 to 100 Hz. */
+function motionWindow(samples: FormSample[], i: number) {
+  const current = samples[i];
+  let j = i;
+  while (j > 0 && current.at - samples[j].at < 300) j--;
+  const previous = samples[j];
+  const seconds = (current.at - previous.at) / 1000;
+  const contiguous = samples
+    .slice(j + 1, i + 1)
+    .every(
+      (s, k) =>
+        s.at - samples[j + k].at <= 250 &&
+        finite(s.values.leftKnee) &&
+        finite(s.values.rightKnee)
+    );
+  const speed =
+    seconds >= 0.15 &&
+    seconds <= 0.5 &&
+    contiguous &&
+    [
+      current.values.leftKnee,
+      current.values.rightKnee,
+      previous.values.leftKnee,
+      previous.values.rightKnee,
+    ].every(finite)
+      ? (current.values.leftKnee! +
+          current.values.rightKnee! -
+          previous.values.leftKnee! -
+          previous.values.rightKnee!) /
+        (2 * seconds)
+      : null;
+  return { previous, speed };
+}
 
 /** Missing samples contribute no evidence. They never become zero-severity observations. */
 function sustained(
@@ -106,7 +149,8 @@ function sustained(
   const duration = Math.max(100, samples.at(-1)!.at - samples[0].at + 100);
   const finishRun = () => {
     if (runMs >= 350) {
-      severity = Math.max(severity, runSeverity / runMs);
+      // Concave ramp makes persistent moderate deviations matter, without lowering targets.
+      severity = Math.max(severity, Math.sqrt(runSeverity / runMs));
       issueMs += runMs;
     }
     runMs = 0;
@@ -122,7 +166,7 @@ function sustained(
       return;
     }
     validMs += dt;
-    if (value >= 0.15) {
+    if (value >= 0.02) {
       runMs += dt;
       runSeverity += value * dt;
     } else finishRun();
@@ -151,24 +195,8 @@ export function evaluateFormRep(
   const num = (s: FormSample, k: string) => s.values[k] as number;
   const peak = (keys: string[], f: (s: FormSample) => number) =>
     Math.max(0, ...samples.filter((s) => has(s, keys)).map(f));
-  const kneeSpeed = (i: number) => {
-    const s = samples[i],
-      prev = samples[Math.max(0, i - 3)];
-    const dt = (s.at - prev.at) / 1000;
-    if (
-      dt < 0.15 ||
-      dt > 0.5 ||
-      !has(s, ['leftKnee', 'rightKnee']) ||
-      !has(prev, ['leftKnee', 'rightKnee'])
-    )
-      return null;
-    return (
-      (num(s, 'leftKnee') +
-        num(s, 'rightKnee') -
-        (num(prev, 'leftKnee') + num(prev, 'rightKnee'))) /
-      (2 * dt)
-    );
-  };
+  const windows = samples.map((_, i) => motionWindow(samples, i));
+  const kneeSpeed = (i: number) => windows[i].speed;
   const gap = peak(['leftKnee', 'rightKnee'], (s) =>
     Math.abs(num(s, 'leftKnee') - num(s, 'rightKnee'))
   );
@@ -178,6 +206,21 @@ export function evaluateFormRep(
     Math.max(Math.abs(num(s, 'leftFootRoll')), Math.abs(num(s, 'rightFootRoll')))
   );
   const lowering = Math.max(0, ...samples.map((_, i) => kneeSpeed(i) ?? 0));
+  const riseDrops = samples.map((s, i) => {
+    const { previous, speed } = windows[i];
+    return speed != null &&
+      speed < -8 &&
+      finite(s.values.chestTilt) &&
+      finite(previous.values.chestTilt)
+      ? Math.max(0, Math.abs(s.values.chestTilt) - Math.abs(previous.values.chestTilt))
+      : 0;
+  });
+  const ankleGap = peak(['leftAnkle', 'rightAnkle'], (s) =>
+    Math.abs(num(s, 'leftAnkle') - num(s, 'rightAnkle'))
+  );
+  const headRoll = peak(['headRoll'], (s) => Math.abs(num(s, 'headRoll')));
+  const headTurn = peak(['headTurn'], (s) => Math.abs(num(s, 'headTurn')));
+
   const observations: Record<
     GroupId,
     { severity: number; coverage: number; issueMs: number; evidence: string }
@@ -193,20 +236,11 @@ export function evaluateFormRep(
     torso: {
       ...sustained(samples, (s, i) => {
         if (!has(s, ['chestRoll', 'chestTilt'])) return null;
-        const prev = samples[Math.max(0, i - 3)];
-        const speed = kneeSpeed(i);
-        // Do not penalize ordinary forward lean. Look for extra chest drop while knees extend.
-        const drop =
-          speed != null && speed < -8 && finite(prev.values.chestTilt)
-            ? excess(
-                Math.abs(num(s, 'chestTilt')) - Math.abs(num(prev, 'chestTilt')),
-                8,
-                20
-              )
-            : 0;
+        // Ordinary forward lean is allowed; extra chest drop while rising is assessed.
+        const drop = excess(riseDrops[i], 8, 20);
         return Math.max(excess(Math.abs(num(s, 'chestRoll')), 10, 25), drop);
       }),
-      evidence: `Peak sideways chest tilt ${roll.toFixed(1)}°; rise coordination checked`,
+      evidence: `Peak sideways chest tilt ${roll.toFixed(1)}°; extra chest drop while rising ${Math.max(...riseDrops).toFixed(1)}°`,
     },
     control: {
       ...sustained(samples, (s, i) => {
@@ -219,7 +253,7 @@ export function evaluateFormRep(
     },
     depth: {
       ...sustained(samples, (s) => (has(s, ['leftKnee', 'rightKnee']) ? 0 : null)),
-      severity: depth >= 98 ? 0 : Math.max(0.2, clamp((98 - depth) / 38)),
+      severity: depth >= 98 ? 0 : Math.sqrt(clamp((98 - depth) / 38)),
       evidence: `Bilateral knee bend ${depth.toFixed(1)}° / 98° target`,
     },
     feet: {
@@ -238,7 +272,7 @@ export function evaluateFormRep(
             )
           : null
       ),
-      evidence: `Peak foot roll ${footRoll.toFixed(1)}°; ankle symmetry checked. Contact is unknown.`,
+      evidence: `Peak foot roll ${footRoll.toFixed(1)}°; ankle difference ${ankleGap.toFixed(1)}°. Contact is unknown.`,
     },
     head: {
       ...sustained(samples, (s) =>
@@ -250,7 +284,7 @@ export function evaluateFormRep(
             )
           : null
       ),
-      evidence: `Peak head inclination ${head.toFixed(1)}° / ±35° target`,
+      evidence: `Peak head inclination ${head.toFixed(1)}° / ±35° target; side tilt ${headRoll.toFixed(1)}°; turn ${headTurn.toFixed(1)}°`,
     },
   };
   const groups = GROUPS.map((g) => ({ ...g, ...observations[g.id] }));
@@ -266,9 +300,9 @@ export function evaluateFormRep(
         'One or more measurement groups had less than 85% usable sample coverage.',
       completedAt: at,
     };
-  const score = Math.round(
-    100 - groups.reduce((sum, g) => sum + g.weight * g.severity, 0)
-  );
+  const score =
+    Math.round((100 - groups.reduce((sum, g) => sum + g.weight * g.severity, 0)) * 10) /
+    10;
   const issues = groups.filter((g) => g.severity >= 0.15);
   const severeGroups = groups.filter((g) => g.critical && g.severity >= 0.65);
   // Cap each group, and require separate substantial issues before the red band.
@@ -292,7 +326,7 @@ export interface FormReview {
   schema: 'form-summary-v1';
   rep: number;
   at: number;
-  stage: 'late-ascent';
+  stage: 'ascent' | 'late-ascent';
   reference: 'upright-relative';
   metrics: Record<string, number | null>;
   groups: { id: GroupId; coverage: number; severity: number; issueMs: number }[];
@@ -330,23 +364,8 @@ export function summarizeFormReview(
       ? round(Math.max(...list.map((s) => Math.abs(s.values[a]! - s.values[b]!))))
       : null;
   };
-  const speeds = samples.map((s, i) => {
-    const prev = samples[Math.max(0, i - 3)];
-    const seconds = (s.at - prev.at) / 1000;
-    return seconds >= 0.15 &&
-      seconds <= 0.5 &&
-      [
-        s.values.leftKnee,
-        s.values.rightKnee,
-        prev.values.leftKnee,
-        prev.values.rightKnee,
-      ].every(finite)
-      ? (s.values.leftKnee! +
-          s.values.rightKnee! -
-          (prev.values.leftKnee! + prev.values.rightKnee!)) /
-          (2 * seconds)
-      : null;
-  });
+  const windows = samples.map((_, i) => motionWindow(samples, i));
+  const speeds = windows.map((w) => w.speed);
   const lowering = speeds.filter(
     (v, i) => finite(v) && samples[i].phase === 'descending'
   ) as number[];
@@ -354,7 +373,7 @@ export function summarizeFormReview(
     (v, i) => finite(v) && samples[i].phase === 'ascending'
   ) as number[];
   const drops = samples.flatMap((s, i) => {
-    const prev = samples[Math.max(0, i - 3)];
+    const prev = windows[i].previous;
     return speeds[i] != null &&
       speeds[i]! < -8 &&
       finite(s.values.chestTilt) &&
@@ -370,7 +389,10 @@ export function summarizeFormReview(
     schema: 'form-summary-v1',
     rep: assessment.rep,
     at: last.at,
-    stage: 'late-ascent',
+    stage:
+      Math.max(last.values.leftKnee ?? 180, last.values.rightKnee ?? 180) <= 30
+        ? 'late-ascent'
+        : 'ascent',
     reference: 'upright-relative',
     metrics: {
       observedDurationMs: last.at - samples[0].at,
@@ -455,14 +477,14 @@ export class FormAnalyzer {
     )
       this.reset();
     if (sample.phase === 'descending' && this.lastPhase === 'ready')
-      this.samples = this.previous.slice(-3);
+      this.samples = this.previous.filter((s) => sample.at - s.at <= 300);
     if (
       ['descending', 'bottom', 'ascending'].includes(sample.phase) ||
       this.samples.length
     )
       this.samples.push(sample);
-    this.samples = this.samples.slice(-800);
-    this.previous = [...this.previous.slice(-2), sample];
+    this.samples = this.samples.filter((s) => sample.at - s.at <= 31000).slice(-6000);
+    this.previous = [...this.previous.filter((s) => sample.at - s.at <= 400), sample];
     this.lastPhase = sample.phase;
   }
   review(rep: number) {
@@ -472,10 +494,9 @@ export class FormAnalyzer {
       last.phase !== 'ascending' ||
       !finite(last.values.leftKnee) ||
       !finite(last.values.rightKnee) ||
-      Math.max(last.values.leftKnee, last.values.rightKnee) > 30 ||
       !this.samples.some((s) => s.phase === 'descending') ||
       !this.samples.some((s) => s.phase === 'bottom') ||
-      this.samples.filter((s) => s.phase === 'ascending').length < 2
+      last.at - (this.samples.find((s) => s.phase === 'ascending')?.at ?? last.at) < 150
     )
       return null;
     const depth = Math.max(

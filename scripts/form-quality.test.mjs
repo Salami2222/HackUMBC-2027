@@ -120,3 +120,42 @@ test('weighted scores remain numeric contributions, independent of rating gates'
   const torso = assess(() => ({ chestRoll: 35 }));
   assert.equal(torso.score, 80);
 });
+
+test('persistent modest deviations deduct points without moving the configured head or depth targets', () => {
+  const r = assess((_, bend) => ({ leftKnee: bend + 16, chestRoll: 13 }), 90);
+  assert.ok(r.score < 80 && r.score > 60, `score ${r.score}`);
+  assert.equal(r.rating, 'suboptimal');
+  assert.ok(assess(() => ({ headInclination: 37 })).score < 99);
+  assert.equal(assess(() => ({ headInclination: 35 })).score, 100);
+});
+
+test('lowering speed and chest drop are measured consistently at 10 through 100 Hz', () => {
+  const results = [];
+  for (const hz of [10, 20, 30, 60, 100]) {
+    const samples = Array.from({ length: hz * 3 + 1 }, (_, i) => {
+      const t = i / hz;
+      const bend = t < 0.6 ? t * 180 : Math.max(0, 108 - (t - 0.6) * 50);
+      return {
+        ...frames()[0],
+        at: 1000 + t * 1000,
+        phase: t < 0.6 ? 'descending' : 'ascending',
+        values: {
+          ...frames()[0].values,
+          leftKnee: bend,
+          rightKnee: bend,
+          chestTilt: t < 0.6 ? 0 : (t - 0.6) * 60,
+        },
+      };
+    });
+    const r = evaluateFormRep(samples, 1, 108, 4000);
+    const control = r.groups.find((g) => g.id === 'control');
+    const torso = r.groups.find((g) => g.id === 'torso');
+    assert.ok(control.severity > 0.45, `${hz} Hz control ${control.severity}`);
+    assert.ok(torso.severity > 0.8, `${hz} Hz torso ${torso.severity}`);
+    results.push(r.score);
+  }
+  assert.ok(
+    Math.max(...results) - Math.min(...results) < 3,
+    results.join(', ')
+  );
+});

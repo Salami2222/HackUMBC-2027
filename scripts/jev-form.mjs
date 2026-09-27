@@ -50,7 +50,7 @@ export function validFormReview(b) {
       'groups',
     ]) &&
     b.schema === 'form-summary-v1' &&
-    b.stage === 'late-ascent' &&
+    ['ascent', 'late-ascent'].includes(b.stage) &&
     b.reference === 'upright-relative' &&
     Number.isInteger(b.rep) &&
     b.rep >= 1 &&
@@ -66,13 +66,13 @@ export function validFormReview(b) {
     b.metrics.observedDurationMs >= 700 &&
     b.metrics.observedDurationMs <= 30500 &&
     b.metrics.sampleCount >= 8 &&
-    b.metrics.sampleCount <= 800 &&
+    b.metrics.sampleCount <= 6000 &&
     Number.isFinite(b.metrics.currentLeftKneeDeg) &&
     Number.isFinite(b.metrics.currentRightKneeDeg) &&
     b.metrics.currentLeftKneeDeg >= 0 &&
     b.metrics.currentRightKneeDeg >= 0 &&
-    b.metrics.currentLeftKneeDeg <= 30 &&
-    b.metrics.currentRightKneeDeg <= 30 &&
+    b.metrics.currentLeftKneeDeg <= 180 &&
+    b.metrics.currentRightKneeDeg <= 180 &&
     b.metrics.descentObservedMs > 0 &&
     b.metrics.bottomObservedMs > 0 &&
     b.metrics.ascentObservedMs > 0 &&
@@ -112,7 +112,7 @@ export function formRequest(body) {
       units:
         'Angles are degrees relative to the upright reference; time is milliseconds; knee bend is zero upright. Null is unknown, never zero.',
       limitations:
-        'Late-ascent partial rep, not yet Ready. Only summarized estimated movement is available. No raw samples. Coverage is usable-data fraction, not probability. These are experimental targets, not injury predictions. Do not infer hip/spine posture, inward knee collapse, foot pressure, load or bracing. Peaks alone do not establish sustained problems; issueMs is accumulated time in runs of at least 350ms. No independent sensor corroboration is available.',
+        'Ascent partial rep, not yet Ready. Only summarized estimated movement is available. No raw samples. Coverage is usable-data fraction, not probability. These are experimental targets, not injury predictions. Do not infer hip/spine posture, inward knee collapse, foot pressure, load or bracing. Peaks alone do not establish sustained problems; issueMs is accumulated time in runs of at least 350ms. Measured severities use a square-root ramp after persistence filtering so moderate deviations contribute. No independent sensor corroboration is available.',
       depthTargetDeg: 98,
       headInclinationLimitDeg: 35,
       metrics: Object.fromEntries(metricKeys.map((k) => [k, body.metrics[k]])),
@@ -196,7 +196,11 @@ export function formMiddleware(key) {
     )
       return reply(403, { error: 'Same-origin JSON required' });
     const apiKey = key();
-    if (!apiKey) return reply(503, { error: 'Jev not configured' });
+    if (!apiKey)
+      return reply(503, {
+        error: 'Jev not configured',
+        code: 'notConfigured',
+      });
     if (busy || Date.now() - lastRequest < 500)
       return reply(429, { error: 'Review already pending' });
     busy = true;
@@ -212,23 +216,46 @@ export function formMiddleware(key) {
       try {
         body = JSON.parse(raw);
       } catch {
-        return reply(400, { error: 'Invalid summary' });
+        return reply(400, {
+          error: 'Invalid summary',
+          code: 'invalidSummary',
+        });
       }
       if (!validFormReview(body))
-        return reply(400, { error: 'Invalid summary' });
+        return reply(400, {
+          error: 'Invalid summary',
+          code: 'invalidSummary',
+        });
       const response = await fetch('https://api.typesafe.ai/v1/systemone', {
         method: 'POST',
-        signal: AbortSignal.timeout(1200),
+        signal: AbortSignal.timeout(2000),
         headers: {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(formRequest(body)),
       });
-      if (!response.ok) return reply(502, { error: 'Jev review unavailable' });
+      if (!response.ok)
+        return reply(502, {
+          error: 'Jev review unavailable',
+          code: [401, 403].includes(response.status)
+            ? 'authentication'
+            : response.status === 429
+              ? 'rateLimited'
+              : 'upstream',
+          upstreamStatus: response.status,
+        });
       return reply(200, parseFormAdvice(await response.json(), body));
-    } catch {
-      return reply(502, { error: 'Jev review unavailable' });
+    } catch (error) {
+      return reply(502, {
+        error: 'Jev review unavailable',
+        code:
+          error.name === 'TimeoutError'
+            ? 'timeout'
+            : error.message === 'Invalid form advice'
+              ? 'invalidResponse'
+              : 'upstream',
+      });
     } finally {
       busy = false;
     }

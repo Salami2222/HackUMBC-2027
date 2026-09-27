@@ -98,6 +98,7 @@
   color: #bdb0d0;
 }
 .set-feedback table {
+  color: inherit;
   width: 100%;
   text-align: left;
   font-size: 12px;
@@ -141,4 +142,87 @@
   color: #aaa1bc;
   margin: 15vh auto;
   text-align: center;
+}
+
+.rep-results {
+  margin: 28px 0;
+}
+.rep-results > h3 {
+  font-size: 16px;
+  margin-bottom: 14px;
+}
+.rep-breakdown {
+  border: 1px solid #43374f;
+  border-radius: 10px;
+  margin: 10px 0;
+  overflow: hidden;
+}
+.rep-breakdown > summary {
+  display: grid;
+  grid-template-columns: 72px 1fr 130px 80px;
+  align-items: center;
+  gap: 12px;
+  padding: 18px;
+  cursor: pointer;
+  background: #b294df08;
+}
+.rep-breakdown > summary:hover {
+  background: #b294df12;
+}
+.rep-breakdown > summary:focus-visible {
+  outline: 2px solid #b99af1;
+  outline-offset: -3px;
+}
+.rep-breakdown > summary strong {
+  color: #ebe4f8;
+  font-size: 14px;
+}
+.rep-expand {
+  text-align: right;
+}
+.rep-breakdown-body {
+  padding: 0 18px 18px;
+}
+.rep-table-wrap {
+  overflow-x: auto;
+}
+.rep-breakdown table {
+  min-width: 720px;
+}
+.rep-breakdown th:first-child {
+  width: 48%;
+}
+.rep-breakdown tbody th {
+  font-weight: 400;
+}
+.rep-breakdown small {
+  display: block;
+  color: #aaa1bc;
+  font-size: 11px;
+  line-height: 1.6;
+  margin-top: 4px;
+}
+.rep-score-equation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding: 18px 0 4px;
+  font-size: 13px;
+}
+.rep-score-equation strong {
+  display: block;
+  font-size: 22px;
+  margin-top: 4px;
+}
+.rep-jev-status {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #43374f;
+  font-size: 13px;
+}
+.rep-jev-status pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  margin-top: 12px;
 }

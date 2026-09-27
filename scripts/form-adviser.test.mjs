@@ -119,11 +119,11 @@ test('summary uses actual timestamps, retains missing data and does not interpre
   assert.equal(validFormReview(b), false);
 });
 
-test('review only becomes available late in ascent with sufficient coverage and phase evidence', () => {
+test('review becomes available early in ascent with sufficient coverage and phase evidence', () => {
   const a = new FormAnalyzer();
   for (const f of frames()) {
     a.observe(f);
-    if (f.values.leftKnee > 30 || f.phase !== 'ascending')
+    if (f.at < 12300 || f.phase !== 'ascending')
       assert.equal(a.review(1), null);
   }
   assert.equal(validFormReview(a.review(1)), true);
@@ -175,7 +175,7 @@ test('uncertain, stale, foreign and changed-factor advice cannot override measur
   for (const bad of [
     null,
     { ...advice, rep: 2 },
-    { ...advice, at: 12000 },
+    { ...advice, at: 8000 },
     { ...advice, at: 15000 },
     parseFormAdvice(response('uncertain'), fixture()),
   ]) {
@@ -268,4 +268,63 @@ test('server forwards only curated summary and rejects off-origin requests', asy
   assert.equal(res.statusCode, 200);
   assert.equal(calls, 1);
   assert.equal(res.body.factors.head.severity, 0.5);
+});
+
+test('early ascent reply survives a pending late refresh and keeps its own input snapshot', async (t) => {
+  let now = 12300;
+  t.mock.method(Date, 'now', () => now);
+  let resolve;
+  t.mock.method(globalThis, 'fetch', async (_, opts) => {
+    const body = JSON.parse(opts.body);
+    return new Promise((r) => {
+      resolve = () =>
+        r({
+          ok: true,
+          status: 200,
+          json: async () => parseFormAdvice(response(), body),
+        });
+    });
+  });
+  const samples = frames().filter((s) => s.at <= now);
+  const early = summarizeFormReview(
+    samples,
+    evaluateFormRep(samples, 1, 100, now)
+  );
+  assert.equal(early.stage, 'ascent');
+  assert.equal(validFormReview(early), true);
+  const a = new FormAdviser();
+  const pending = a.request(early);
+  now += 350;
+  resolve();
+  await pending;
+  now = 13700;
+  const refresh = a.request(fixture());
+  now = 14000;
+  const rep = a.finalize(assessment());
+  assert.equal(rep.score, 98);
+  assert.equal(rep.jev.attempts, 2);
+  assert.equal(rep.jev.summary.at, early.at);
+  resolve();
+  await refresh;
+  assert.equal(a.advice, null);
+  assert.equal(rep.score, 98);
+});
+
+test('feedback retains request failures and submitted inputs without exposing credentials', async (t) => {
+  t.mock.method(Date, 'now', () => 13700);
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: false,
+    status: 502,
+    json: async () => ({ code: 'authentication' }),
+  }));
+  const a = new FormAdviser();
+  await a.request(fixture());
+  const rep = a.finalize(assessment());
+  assert.equal(rep.score, 100);
+  assert.equal(rep.jev.attempts, 1);
+  assert.equal(rep.jev.httpStatus, 502);
+  assert.match(rep.jev.reason, /rejected the API key/);
+  assert.equal(rep.jev.summary.schema, 'form-summary-v1');
+  const noRequest = new FormAdviser().finalize(assessment());
+  assert.match(noRequest.jev.reason, /Not requested/);
 });

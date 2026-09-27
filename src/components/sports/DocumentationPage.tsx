@@ -185,10 +185,12 @@ export function DocumentationPage() {
         </div>
         <p className="docs-note">
           Ranges run from the start of a penalty to its full severity. Movement
-          issues need at least 15% severity sustained for 350 ms; a brief spike
-          does not become a flag. Depth uses the completed rep’s peak bend
-          instead. These are current experimental targets, not universal lifting
-          standards.
+          deviations must persist for 350 ms beyond a small noise margin; a
+          brief spike does not become a flag. A square-root penalty ramp gives
+          moderate sustained deviations meaningful weight. Speed uses a 300 ms
+          time window, independent of sensor frame rate. Depth uses the
+          completed rep’s peak bend instead. These are current experimental
+          targets, not universal lifting standards.
         </p>
         <div className="docs-ratings">
           <article className="docs-optimal">
@@ -229,9 +231,10 @@ export function DocumentationPage() {
         </div>
         <p>
           For form scoring, Jev reviews 27 curated values and six factor
-          summaries near the end of ascent—angles, durations, asymmetry and
-          control—not the raw tracker stream. It can interpret patterns within
-          the measured factors; the 98° depth rule stays measurement-based.
+          summaries during ascent, with a second opportunity near the
+          end—angles, durations, asymmetry and control—not the raw tracker
+          stream. It can interpret patterns within the measured factors; the 98°
+          depth rule stays measurement-based.
         </p>
         <div className="docs-formula">
           <strong>Final score = 95% measured + 5% Jev proposal</strong>
@@ -242,7 +245,11 @@ export function DocumentationPage() {
           factors keep their measured values; missing, late or unavailable
           reviews leave the measured score unchanged. Scores freeze at Ready,
           and category flags remain controlled by measurements. Open a rep’s
-          score details in Feedback to see the breakdown and review inputs.
+          breakdown in Feedback to see factor scores, points lost, coverage,
+          request status and review inputs. Reviews begin after 150 ms of
+          ascent; up to two requests are allowed per rep. Advice must be under
+          five seconds old at Ready, and changed or uncertain factors retain
+          their measured values.
         </p>
       </section>
 
