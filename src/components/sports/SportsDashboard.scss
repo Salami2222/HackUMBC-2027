@@ -1991,3 +1991,89 @@
     grid-template-columns: 1fr;
   }
 }
+
+.sports-app .measurement-panel {
+  margin: 24px 0;
+  padding: 22px 0;
+  border-top: 1px solid var(--ml-border);
+  border-bottom: 1px solid var(--ml-border);
+
+  p,
+  small {
+    color: var(--ml-muted);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  progress {
+    width: 100%;
+    accent-color: var(--ml-accent);
+  }
+
+  .measurement-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    > strong {
+      margin-right: auto;
+      font-size: 15px;
+    }
+    a {
+      color: var(--ml-accent-soft);
+      font-size: 12px;
+    }
+  }
+
+  .measurement-nodes,
+  .measurement-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 12px;
+    margin: 18px 0;
+    > div {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 14px;
+      border: 1px solid var(--ml-border);
+      border-radius: 10px;
+      min-width: 0;
+    }
+  }
+
+  .measurement-nodes {
+    font-size: 12px;
+    span {
+      color: var(--ml-muted);
+    }
+    [data-ready='true'] span {
+      color: #75d6d0;
+    }
+  }
+
+  .measurement-grid {
+    span {
+      color: var(--ml-muted);
+      font-size: 12px;
+    }
+    strong {
+      font-size: 25px;
+      font-variant-numeric: tabular-nums;
+    }
+    small {
+      font-size: 11px;
+    }
+  }
+}
+.tracking-service-control {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  small {
+    color: var(--ml-muted);
+    max-width: 440px;
+    font-size: 11px;
+  }
+}

@@ -23,6 +23,9 @@ import { NodeSetup } from './NodeSetup';
 import { NodePicker } from './NodePicker';
 import { NodeOrientation } from './NodeOrientation';
 import { NodeBattery } from './NodeBattery';
+import { MeasurementPanel } from './MeasurementPanel';
+import { TrackingServiceControl } from './TrackingServiceControl';
+import { useMeasurements } from '@/measurement/MeasurementProvider';
 
 import {
   NODE_POSITIONS,
@@ -33,6 +36,7 @@ import {
 } from './node-positions';
 
 export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
+  const measurements = useMeasurements();
   const { isConnected, sendRPCPacket, useDataFeedPacket } = useWebsocketAPI();
   const trackers = useAtomValue(flatTrackersAtom).filter(
     ({ tracker }) => tracker.info?.isImu && !tracker.info.isComputed
@@ -172,6 +176,7 @@ export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
     request.displayName = targetPosition?.label ?? nodeHardwareName(selected);
     request.allowDriftCompensation =
       selected.info?.allowDriftCompensation ?? false;
+    measurements.invalidate();
     sendRPCPacket(RpcMessage.AssignTrackerRequest, request);
     setSelectedKey(nodeKey(selected));
     setAssignment({
@@ -205,10 +210,28 @@ export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
           </button>
           <NodeOrientation
             ready={fresh && assignedOnline.length > 0 && !assignmentPending}
-            nodeCount={assignedOnline.length}
+            nodeCount={fresh ? assignedOnline.length : 0}
+            blockedReason={
+              !isConnected
+                ? 'The tracking service is disconnected. Restart the service if needed.'
+                : !fresh
+                  ? 'Waiting for fresh tracker data from the service.'
+                  : assignmentPending
+                    ? 'Waiting for the body assignment to be saved.'
+                    : 'No assigned nodes are online. Connect the computer and nodes to the same Wi-Fi, then assign their body positions.'
+            }
             otherResetBusy={reset.status === 'counting'}
+            configurationKey={assignedOnline
+              .map(
+                ({ tracker }) => `${nodeKey(tracker)}:${tracker.info?.bodyPart}`
+              )
+              .sort()
+              .join('|')}
+            onStart={measurements.invalidate}
+            onComplete={measurements.confirmOrientation}
           />
         </div>
+        <TrackingServiceControl />
       </div>
       <div className="calibration-layout">
         <section
@@ -361,6 +384,7 @@ export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
           <div className="sports-viewport">
             {active && skeletonLive ? (
               <SkeletonVisualizerWidget
+                floorAnchored
                 onInit={(context) => {
                   view.current =
                     context.addView({
@@ -410,6 +434,7 @@ export function LiveMovementDashboard({ active = true }: { active?: boolean }) {
           </div>
         </section>
       </div>
+      <MeasurementPanel setup />
       <NodeSetup open={setupOpen} onToggle={() => setSetupOpen(!setupOpen)} />
       {unassignedOnline.length > 0 && (
         <section

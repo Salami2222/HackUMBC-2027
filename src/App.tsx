@@ -20,6 +20,8 @@ import { ElectronContextC, provideElectron } from './hooks/electron';
 import { AppLocalizationProvider } from './i18n/config';
 import { SportsDashboard } from './components/sports/SportsDashboard';
 import { LiveMovementDashboard } from './components/sports/LiveMovementDashboard';
+import { MeasurementProvider } from './measurement/MeasurementProvider';
+import { useHeadlessGrounding } from './hooks/headless-grounding';
 export const GH_REPO = 'SlimeVR/SlimeVR-Server';
 export const VersionContext = createContext('');
 export const DOCS_SITE = 'https://docs.slimevr.dev';
@@ -27,6 +29,7 @@ export const SLIMEVR_DISCORD = 'https://discord.gg/slimevr';
 
 function AppSurface() {
   const { pathname } = useLocation();
+  const groundingError = useHeadlessGrounding();
   if (!['/', '/calibration'].includes(pathname))
     return <Navigate to="/" replace />;
 
@@ -49,6 +52,7 @@ function AppSurface() {
           <NavLink to="/calibration">Sensor Calibration</NavLink>
         </nav>
       </header>
+      {groundingError && <p role="alert">{groundingError}</p>}
       <div hidden={pathname !== '/'}>
         <SportsDashboard active={pathname === '/'} />
       </div>
@@ -164,7 +168,9 @@ export default function App() {
                     <VersionContext.Provider value={updateFound}>
                       <div className="h-full w-full text-standard bg-background-80 text-background-10">
                         <Preload />
-                        <AppSurface />
+                        <MeasurementProvider>
+                          <AppSurface />
+                        </MeasurementProvider>
                       </div>
                     </VersionContext.Provider>
                   </TrackingChecklistProvider>

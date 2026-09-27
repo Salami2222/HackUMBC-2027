@@ -16,6 +16,7 @@ import {
 } from '@/components/widgets/SkeletonVisualizerWidget';
 import './SportsDashboard.scss';
 import { ImuAngleGraphs } from './ImuAngleGraphs';
+import { MeasurementPanel } from './MeasurementPanel';
 
 export function SportsDashboard({ active = true }: { active?: boolean }) {
   const { isConnected, useDataFeedPacket } = useWebsocketAPI();
@@ -69,6 +70,7 @@ export function SportsDashboard({ active = true }: { active?: boolean }) {
         <div className="sports-viewport">
           {active && live ? (
             <SkeletonVisualizerWidget
+              floorAnchored
               onInit={(context) => {
                 view.current =
                   context.addView({
@@ -122,6 +124,7 @@ export function SportsDashboard({ active = true }: { active?: boolean }) {
           </div>
         </div>
       </section>
+      <MeasurementPanel />
       <ImuAngleGraphs />
     </main>
   );

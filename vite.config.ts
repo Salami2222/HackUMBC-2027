@@ -5,6 +5,7 @@ import { execSync } from 'child_process';
 import path from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
 import jotaiReactRefresh from 'jotai/babel/plugin-react-refresh';
+import { trackingServicePlugin } from './scripts/tracking-service-plugin.mjs';
 
 function gitOutput(command: string, fallback = '') {
   try {
@@ -51,6 +52,7 @@ export default defineConfig({
     __GIT_CLEAN__: gitClean,
   },
   plugins: [
+    trackingServicePlugin(),
     react({ babel: { plugins: [jotaiReactRefresh] } }),
     i18nHotReload(),
     visualizer() as PluginOption,

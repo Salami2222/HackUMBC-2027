@@ -28,6 +28,7 @@ import { bonesAtom } from '@/store/app-store';
 import { useConfig } from '@/hooks/config';
 import { Tween } from '@tweenjs/tween.js';
 import { EyeIcon } from '@/components/commons/icon/EyeIcon';
+import { floorOffset, standingHeight } from '@/measurement/floor';
 
 const GROUND_COLOR = '#2c2c6b';
 
@@ -56,7 +57,8 @@ export type SkeletonPreviewView = {
 
 function initializePreview(
   canvas: HTMLCanvasElement,
-  skeleton: (BoneKind | Bone)[]
+  skeleton: (BoneKind | Bone)[],
+  floorAnchored: boolean
 ) {
   let lastRenderTimeRef = 0;
   let frameInterval = 0;
@@ -120,6 +122,7 @@ function initializePreview(
   };
 
   const computeUserHeight = (bones: Map<BodyPart, BoneT>) => {
+    if (floorAnchored) return standingHeight(bones) ?? heightOffset;
     const hmd = bones.get(BodyPart.HEAD);
     if (hmd?.headPositionG?.y && hmd.headPositionG.y > 0) {
       return hmd.headPositionG.y / 0.936;
@@ -133,6 +136,7 @@ function initializePreview(
   };
 
   const computeSkeletonOffset = (bones: Map<BodyPart, BoneT>) => {
+    if (floorAnchored) return floorOffset(bones) ?? skeletonOffset;
     const hmd = bones.get(BodyPart.HEAD);
     // If I know the head position, don't use an offset
     if (hmd?.headPositionG?.y !== undefined && hmd.headPositionG?.y > 0) {
@@ -300,9 +304,11 @@ type PreviewContext = ReturnType<typeof initializePreview>;
 function SkeletonVisualizer({
   onInit,
   disabled = false,
+  floorAnchored = false,
 }: {
   onInit: (context: PreviewContext) => void;
   disabled?: boolean;
+  floorAnchored?: boolean;
 }) {
   const { config } = useConfig();
 
@@ -357,7 +363,8 @@ function SkeletonVisualizer({
 
     previewContext.current = initializePreview(
       canvasRef.current,
-      createChildren(bones, BoneKind.root)
+      createChildren(bones, BoneKind.root),
+      floorAnchored
     );
     if (!config?.devSettings.fastDataFeed)
       previewContext.current.setFrameInterval(1000 / LOW_FRAMERATE);
@@ -379,7 +386,7 @@ function SkeletonVisualizer({
       containerRef.current.removeEventListener('mouseenter', onEnter);
       containerRef.current.removeEventListener('mouseleave', onLeave);
     };
-  }, [disabled]);
+  }, [disabled, floorAnchored]);
 
   return (
     <div ref={containerRef} className={classNames('w-full h-full')}>
@@ -405,10 +412,12 @@ export function SkeletonVisualizerWidget({
   },
   disabled = false,
   toggleDisabled,
+  floorAnchored = false,
 }: {
   onInit?: (context: PreviewContext) => void;
   disabled?: boolean;
   toggleDisabled?: () => void;
+  floorAnchored?: boolean;
 }) {
   const { l10n } = useLocalization();
   const [error, setError] = useState(false);
@@ -421,7 +430,11 @@ export function SkeletonVisualizerWidget({
         })}
       >
         <ErrorBoundary onError={() => setError(true)} fallback={<></>}>
-          <SkeletonVisualizer onInit={onInit} disabled={disabled} />
+          <SkeletonVisualizer
+            onInit={onInit}
+            disabled={disabled}
+            floorAnchored={floorAnchored}
+          />
         </ErrorBoundary>
       </div>
       <div

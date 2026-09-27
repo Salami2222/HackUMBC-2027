@@ -17,12 +17,12 @@ export const NODE_POSITIONS = [
   },
   {
     part: BodyPart.LEFT_LOWER_ARM,
-    label: 'Left hand (wrist)',
+    label: 'Left hand / wrist',
     hint: 'Place on your left forearm, just above the wrist. This measures forearm orientation.',
   },
   {
     part: BodyPart.RIGHT_LOWER_ARM,
-    label: 'Right hand (wrist)',
+    label: 'Right hand / wrist',
     hint: 'Place on your right forearm, just above the wrist. This measures forearm orientation.',
   },
   {

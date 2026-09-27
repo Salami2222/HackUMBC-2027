@@ -6,6 +6,11 @@ import {
   ResetStatus,
   ResetType,
   RpcMessage,
+  ArmsMountingResetMode,
+  ChangeSettingsRequestT,
+  ResetsSettingsT,
+  SettingsRequestT,
+  SettingsResponseT,
 } from 'solarxr-protocol';
 import { serverGuardsAtom } from '@/store/app-store';
 import { useWebsocketAPI } from '@/hooks/websocket-api';
@@ -13,11 +18,19 @@ import { useWebsocketAPI } from '@/hooks/websocket-api';
 export function NodeOrientation({
   ready,
   nodeCount,
+  blockedReason,
   otherResetBusy,
+  configurationKey,
+  onStart,
+  onComplete,
 }: {
   ready: boolean;
   nodeCount: number;
+  blockedReason: string;
   otherResetBusy: boolean;
+  configurationKey: string;
+  onStart: () => void;
+  onComplete: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const guards = useAtomValue(serverGuardsAtom);
@@ -26,10 +39,17 @@ export function NodeOrientation({
   const [message, setMessage] = useState('');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
-  const pending = useRef<{ type: ResetType; deadline: number } | null>(null);
+  const [armMode, setArmMode] = useState(ArmsMountingResetMode.TPOSE_UP);
+  const requestedMode = useRef(ArmsMountingResetMode.TPOSE_UP);
+  const pending = useRef<{
+    type: ResetType | 'read-settings' | 'confirm-settings';
+    deadline: number;
+  } | null>(null);
+  const participants = useRef<string | null>(null);
 
   const fail = (reason: string) => {
     pending.current = null;
+    participants.current = null;
     setBusy(false);
     setCountdown(null);
     setStep('upright');
@@ -38,15 +58,73 @@ export function NodeOrientation({
 
   useEffect(() => {
     const timer = setInterval(() => {
-      if (!pending.current) return;
+      if (
+        participants.current !== null &&
+        participants.current !== configurationKey
+      ) {
+        fail(
+          'The connected nodes or assignments changed. Start calibration again.'
+        );
+        return;
+      }
+      if (!pending.current && participants.current === null) return;
       if (!ready) {
         fail('Tracking disconnected. Reconnect your nodes, then start again.');
-      } else if (Date.now() > pending.current.deadline) {
+      } else if (pending.current && Date.now() > pending.current.deadline) {
         fail('Calibration was not confirmed. Check the connection and retry.');
       }
     }, 250);
     return () => clearInterval(timer);
-  }, [ready]);
+  }, [ready, configurationKey]);
+
+  const sendReset = (type: ResetType) => {
+    pending.current = { type, deadline: Date.now() + 15000 };
+    const request = new ResetRequestT();
+    request.resetType = type;
+    request.bodyParts = [];
+    sendRPCPacket(RpcMessage.ResetRequest, request);
+  };
+
+  useRPCPacket(RpcMessage.SettingsResponse, (response: SettingsResponseT) => {
+    const phase = pending.current?.type;
+    if (phase !== 'read-settings' && phase !== 'confirm-settings') return;
+    if (!ready || participants.current !== configurationKey) {
+      fail(
+        'The connected nodes or assignments changed. Start calibration again.'
+      );
+      return;
+    }
+    if (!response.resetsSettings) {
+      fail(
+        'The service did not provide calibration settings. Retry calibration.'
+      );
+      return;
+    }
+    if (phase === 'read-settings') {
+      const request = new ChangeSettingsRequestT();
+      request.resetsSettings = Object.assign(
+        new ResetsSettingsT(),
+        response.resetsSettings,
+        {
+          armsMountingResetMode: requestedMode.current,
+        }
+      );
+      pending.current = {
+        type: 'confirm-settings',
+        deadline: Date.now() + 10000,
+      };
+      sendRPCPacket(RpcMessage.ChangeSettingsRequest, request);
+      sendRPCPacket(RpcMessage.SettingsRequest, new SettingsRequestT());
+    } else if (
+      response.resetsSettings.armsMountingResetMode === requestedMode.current
+    ) {
+      sendReset(ResetType.Full);
+    } else {
+      fail(
+        'The service did not confirm the selected arm pose. Retry calibration.'
+      );
+    }
+  });
 
   useRPCPacket(RpcMessage.ResetResponse, (response: ResetResponseT) => {
     if (
@@ -55,7 +133,7 @@ export function NodeOrientation({
       (response.bodyParts?.length ?? 0) > 0
     )
       return;
-    if (!ready) {
+    if (!ready || participants.current !== configurationKey) {
       fail('Tracking disconnected. Reconnect your nodes, then start again.');
       return;
     }
@@ -68,6 +146,10 @@ export function NodeOrientation({
       setBusy(false);
       setCountdown(null);
       setStep(response.resetType === ResetType.Full ? 'ski' : 'done');
+      if (response.resetType === ResetType.Mounting) {
+        participants.current = null;
+        onComplete();
+      }
       setMessage('');
     }
   });
@@ -76,14 +158,22 @@ export function NodeOrientation({
     if (!ready || pending.current || otherResetBusy) return;
     if (step === 'ski' && !guards?.canDoMounting) return;
     const type = step === 'upright' ? ResetType.Full : ResetType.Mounting;
-    pending.current = { type, deadline: Date.now() + 15000 };
+    if (step === 'upright') participants.current = configurationKey;
+    if (participants.current !== configurationKey) {
+      fail('The connected nodes changed. Start calibration again.');
+      return;
+    }
+    onStart();
     setBusy(true);
     setCountdown(null);
     setMessage('');
-    const request = new ResetRequestT();
-    request.resetType = type;
-    request.bodyParts = [];
-    sendRPCPacket(RpcMessage.ResetRequest, request);
+    if (type === ResetType.Full) {
+      requestedMode.current = armMode;
+      pending.current = { type: 'read-settings', deadline: Date.now() + 10000 };
+      sendRPCPacket(RpcMessage.SettingsRequest, new SettingsRequestT());
+    } else {
+      sendReset(type);
+    }
   };
 
   return (
@@ -92,6 +182,7 @@ export function NodeOrientation({
         className="primary-button"
         onClick={() => {
           setStep('upright');
+          participants.current = null;
           setMessage('');
           dialog.current?.showModal();
         }}
@@ -112,35 +203,57 @@ export function NodeOrientation({
             ? 'Orientation calibrated'
             : step === 'upright'
               ? '1. Stand upright'
-              : '2. Hold the ski pose'}
+              : armMode === ArmsMountingResetMode.TPOSE_UP
+                ? '2. T-pose arms, ski-pose legs'
+                : '2. Hold the ski pose'}
         </h2>
         <p>
           {step === 'done'
-            ? 'Mounting calibration confirmed. Stand upright and check the live skeleton. Repeat this whenever a tracker moves or you change how it is worn.'
+            ? 'The service confirmed mounting calibration. Stand upright, check the live skeleton, then capture an upright reference below. This still needs your visual check; repeat whenever a tracker moves.'
             : step === 'upright'
               ? 'Wear and assign all your nodes first. Face forward with your arms straight down at your sides. Start the reset, then hold still through the countdown.'
-              : 'Bend your knees, lean your upper body forward, and bend your arms as shown. Start auto-orientation and hold this pose through the countdown.'}
+              : armMode === ArmsMountingResetMode.TPOSE_UP
+                ? 'Raise both arms straight out to the sides, 90 degrees from your torso, in a T. For your leg and chest trackers, also bend your knees and lean your torso forward into the ski pose. Hold this combined pose through the countdown.'
+                : 'Bend your knees, lean your upper body forward, and bend your arms as shown. Start auto-orientation and hold this pose through the countdown.'}
         </p>
-        {step !== 'done' && (
-          <img
-            src={
-              step === 'upright'
-                ? '/images/reset/FullResetPose.webp'
-                : '/images/mounting-reset-pose.webp'
-            }
-            alt={
-              step === 'upright'
-                ? 'Stand straight with arms at your sides, facing forward'
-                : 'Ski pose with knees and elbows bent and torso leaning forward'
-            }
-          />
+        {step === 'upright' && (
+          <label className="node-input">
+            <span>Arm calibration pose</span>
+            <select
+              value={armMode}
+              disabled={busy}
+              onChange={(event) => setArmMode(Number(event.target.value))}
+            >
+              <option value={ArmsMountingResetMode.TPOSE_UP}>
+                T-pose (arms out)
+              </option>
+              <option value={ArmsMountingResetMode.BACK}>
+                Ski pose (arms bent)
+              </option>
+            </select>
+          </label>
         )}
+        {step !== 'done' &&
+          (step === 'upright' || armMode === ArmsMountingResetMode.BACK) && (
+            <img
+              src={
+                step === 'upright'
+                  ? '/images/reset/FullResetPose.webp'
+                  : '/images/mounting-reset-pose.webp'
+              }
+              alt={
+                step === 'upright'
+                  ? 'Stand straight with arms at your sides, facing forward'
+                  : 'Ski pose with knees and elbows bent and torso leaning forward'
+              }
+            />
+          )}
         <p className="node-orientation-scope">
-          {ready ? nodeCount : 0} assigned online nodes. Each node gets its own
-          mounting correction in one calibration.
+          {nodeCount} assigned online nodes. Each node gets its own mounting
+          correction in one calibration.
         </p>
         <div role="status">
-          {!ready && <p>Connect and assign your nodes before calibrating.</p>}
+          {!ready && <p>{blockedReason}</p>}
           {step === 'ski' && !guards?.canDoMounting && ready && (
             <p>
               The service requires an upright reset before mounting calibration.
