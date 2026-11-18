@@ -2,6 +2,12 @@
 
 Kinetiq uses SlimeVR's React frontend and its existing skeleton visualizer. The default **Tracking** tab displays the live skeleton from assigned physical trackers and offers independent three-rep Form Test and eight-rep Working Set sessions. It requires fresh tracker and bone feeds and shows a waiting state when tracking is unavailable; it has no simulated tracking source. Completed reps receive experimental measured-movement scores. **Sensor Calibration** connects to the local tracking service for live body-node assignment, automatic mounting calibration, battery levels, and a live skeleton preview.
 
+## System architecture at a glance
+
+![Kinetiq sensor-to-score architecture: wearable IMUs, calibrated measurements, confidence-gated Jev review, and measured scoring fallback](docs/sensor-to-score-architecture.svg)
+
+The diagram summarizes the measurement and scoring pipeline. The 95%/5% blend applies only when an AI review qualifies; otherwise scoring remains measurement-based. These weights are not accuracy measurements.
+
 ## Run locally
 
 ```sh
